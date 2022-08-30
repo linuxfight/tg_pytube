@@ -8,7 +8,7 @@ from functools import partial
 
 
 def get_token():
-    token = open("token.txt", 'r').read()
+    token = open("token.txt", 'r').read().strip()
     return token
 
 
