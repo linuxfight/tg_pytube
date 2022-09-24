@@ -1,19 +1,40 @@
 import os
 import asyncio
+import json
 
-from aiogram import Bot, Dispatcher, executor, types
-from aiogram.types import InputFile
+from os.path import exists
 from pytube import YouTube
 from functools import partial
+from pyrogram import Client, filters
+from pyrogram.types import Message
 
 
-def get_token():
-    token = open("token.txt", 'r').read().strip()
-    return token
+def config(key):
+    if exists("config.txt"):
+        data = json.loads(open("config.txt", 'r').read())
+        return str(data[key])
+    else:
+        data = {
+            'bot_token': 'BOT_TOKEN',
+            'api_hash': 'API_HASH',
+            'api_id': 'API_ID'
+        }
+        open("config.txt", 'w').write(json.dumps(data))
+        quit(0)
 
 
-bot = Bot(token=get_token())
-dp = Dispatcher(bot)
+def login():
+    if exists("tgdl_bot.session"):
+        return Client("tgdl_bot")
+    return Client(
+        "tgdl_bot",
+        api_id=config('api_id'),
+        api_hash=config('api_hash'),
+        bot_token=config('bot_token')
+    )
+
+
+app = login()
 path = os.path.join(os.getcwd() + '/videos/')
 loop = asyncio.get_event_loop()
 
@@ -33,11 +54,11 @@ def is_url(url):
     return False
 
 
-async def send_video(msg: types.message):
+async def send_video(msg: Message):
     if not is_url(msg.text):
-        await bot.send_message(
+        await app.send_message(
             chat_id=msg.chat.id,
-            reply_to_message_id=msg.message_id,
+            reply_to_message_id=msg.id,
             text="Сообщение не является ссылкой"
         )
         return
@@ -45,10 +66,11 @@ async def send_video(msg: types.message):
     filename = video_id + '.mp4'
     if os.path.exists(os.path.join(path + filename)):
         video = os.path.join(path + filename)
-        await bot.send_document(
+        await app.send_document(
             chat_id=msg.chat.id,
-            reply_to_message_id=msg.message_id,
-            document=InputFile(path_or_bytesio=video, filename=filename)
+            reply_to_message_id=msg.id,
+            document=video,
+            file_name=filename
         )
         return
     video = await loop.run_in_executor(
@@ -59,21 +81,32 @@ async def send_video(msg: types.message):
             filename=filename
         )
     )
-    await bot.send_document(
+    await app.send_document(
         chat_id=msg.chat.id,
-        reply_to_message_id=msg.message_id,
-        document=InputFile(path_or_bytesio=video, filename=filename)
+        reply_to_message_id=msg.id,
+        document=video,
+        file_name=filename
     )
 
 
-@dp.message_handler()
-async def download_video(msg: types.message):
+@app.on_message()
+async def download_video(client, msg: Message):
     await send_video(msg)
+
+
+@app.on_message(filters.command("/start"))
+async def start_message(client, message: Message):
+    await app.send_message(
+        chat_id=message.chat.id,
+        text="Привет, я помогу тебе скачать видео с Youtube! Отправь мне ссылку и я отправлю тебе видео.",
+        reply_to_message_id=message.reply_to_message.id
+    )
 
 
 if __name__ == '__main__':
     try:
         print("Bot is running")
-        executor.start_polling(dp)
+        app.run()
     except KeyboardInterrupt:
+        app.stop()
         pass
