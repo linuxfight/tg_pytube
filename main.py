@@ -1,6 +1,7 @@
 import os
 import asyncio
 import json
+import re
 
 from os.path import exists
 from pytube import YouTube
@@ -49,8 +50,10 @@ def get_video_id(url: str):
 
 
 def is_url(url):
-    if "youtube.com" in url or "youtu.be" in url:
-        return True
+    match_obj = re.match(r'^((?:https?:)?//)?((?:www|m)\.)?(youtube(-nocookie)?\.com|youtu.be)(/(?:[\w\-]+\?v=|embed/|v'
+                         r'/)?)([\w\-]+)(\S+)?$', url)
+    if match_obj:
+         return True
     return False
 
 
@@ -64,6 +67,11 @@ async def send_video(msg: Message):
         return
     video_id = get_video_id(msg.text)
     filename = video_id + '.mp4'
+    await app.send_message(
+        chat_id=msg.chat.id,
+        reply_to_message_id=msg.id,
+        text="Обработка запроса"
+    )
     if os.path.exists(os.path.join(path + filename)):
         video = os.path.join(path + filename)
         await app.send_document(
