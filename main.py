@@ -89,11 +89,6 @@ async def send_video(msg: Message):
     )
 
 
-@app.on_message()
-async def download_video(client, msg: Message):
-    await send_video(msg)
-
-
 @app.on_message(filters.command("/start"))
 async def start_message(client, message: Message):
     await app.send_message(
@@ -101,6 +96,11 @@ async def start_message(client, message: Message):
         text="Привет, я помогу тебе скачать видео с Youtube! Отправь мне ссылку и я отправлю тебе видео.",
         reply_to_message_id=message.reply_to_message.id
     )
+
+
+@app.on_message()
+async def download_video(client, msg: Message):
+    await send_video(msg)
 
 
 if __name__ == '__main__':
