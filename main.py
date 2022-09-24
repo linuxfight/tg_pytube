@@ -89,7 +89,7 @@ async def send_video(msg: Message):
     )
 
 
-@app.on_message(filters.command("/start"))
+@app.on_message(filters.command("start"))
 async def start_message(client, message: Message):
     await app.send_message(
         chat_id=message.chat.id,
