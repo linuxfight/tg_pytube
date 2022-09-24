@@ -94,7 +94,7 @@ async def start_message(client, message: Message):
     await app.send_message(
         chat_id=message.chat.id,
         text="Привет, я помогу тебе скачать видео с Youtube! Отправь мне ссылку и я отправлю тебе видео.",
-        reply_to_message_id=message.reply_to_message.id
+        reply_to_message_id=message.id
     )
 
 
