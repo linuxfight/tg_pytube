@@ -1,11 +1,10 @@
 import os
-import asyncio
 import json
 import re
-import ffmpeg
 import requests
 
 
+from threading import Thread
 from urllib.parse import urlparse
 from os.path import exists
 from pytube import YouTube
@@ -91,7 +90,7 @@ async def download_video(client, video_url, filename, bot_msg):
         except:
             pass
 
-    with open(path + filename, 'wb') as outfile:
+    with open(filename, 'wb') as outfile:
         for chunk in chunks:
             outfile.write(chunk)
 
@@ -116,7 +115,7 @@ async def download_audio(client, video_url, filename, bot_msg):
         except:
             pass
 
-    with open(path + filename, 'wb') as outfile:
+    with open(filename, 'wb') as outfile:
         for chunk in chunks:
             outfile.write(chunk)
 
@@ -139,15 +138,19 @@ async def download(video_url, video_id, bot_msg):
     output_filename = video_id + '.mp4'
     await download_audio(client=app, video_url=video_url, filename=audio_filename, bot_msg=bot_msg)
     await download_video(client=app, video_url=video_url, filename=video_filename, bot_msg=bot_msg)
-    await app.edit_message_text(chat_id=bot_msg.chat.id, message_id=bot_msg.id, text='Соединение аудио и видео, пожалуйста подождите')
-    video_stream = ffmpeg.input(path + video_filename)
-    audio_stream = ffmpeg.input(path + audio_filename)
-    ffmpeg.output(audio_stream, video_stream, path + output_filename).run()
-    os.remove(video_filename)
-    os.remove(audio_filename)
-    await app.delete_messages(chat_id=bot_msg.chat.id, message_ids=bot_msg.id)
+    command: str = 'ffmpeg -i ' + video_filename + ' -i ' + audio_filename + ' -c:v copy -c:a copy ' + output_filename
+    #await app.edit_message_text(chat_id=bot_msg.chat.id, message_id=bot_msg.id, text='Соединение аудио и видео, пожалуйста подождите')
+    thread = Thread(group=None, target=lambda:os.system(command))
+    thread.run()
+    while thread.is_alive():
+        print("Working")
+    else:
+        os.remove(video_filename)
+        os.remove(audio_filename)
+        await app.edit_message_text(chat_id=bot_msg.chat.id, message_id=bot_msg.id, text='Готово!')
 
-    return path + output_filename
+        return output_filename
+    #ffmpeg -i videoplayback.mp4 -i videoplayback.mp4 -c:v copy -c:a copy output.mp4
 
 
 @app.on_message(filters.command("start"))
@@ -185,6 +188,7 @@ async def on_link(client, msg: Message):
         )
         return
     video = await download(msg.text, get_video_id(msg.text), bot_msg)
+    await app.delete_messages(chat_id=bot_msg.chat.id, message_ids=bot_msg.id)
     await app.send_document(
         chat_id=msg.chat.id,
         reply_to_message_id=msg.id,
