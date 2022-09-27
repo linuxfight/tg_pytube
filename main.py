@@ -2,12 +2,17 @@ import os
 import asyncio
 import json
 import re
+import ffmpeg
+import requests
 
+
+from urllib.parse import urlparse
 from os.path import exists
 from pytube import YouTube
-from functools import partial
 from pyrogram import Client, filters
 from pyrogram.types import Message
+import multiprocessing as mp
+from math import ceil
 
 
 def config(key):
@@ -41,11 +46,17 @@ loop = asyncio.get_event_loop()
 
 
 def get_video_id(url: str):
-    url = url.replace('https://www.youtube.com/', '')
-    url = url.replace('https://www.youtu.be', '')
-    url = url.replace('watch?v=', '')
-    url = url.replace('embed/', '')
-    url = url.replace('v/', '')
+    query = urlparse(url)
+    if query.hostname == 'youtu.be':
+        return query.path[1:]
+    if query.hostname in ('www.youtube.com', 'youtube.com'):
+        if query.path == '/watch':
+            p = urlparse.parse_qs(query.query)
+            return p['v'][0]
+        if query.path[:7] == '/embed/':
+            return query.path.split('/')[2]
+        if query.path[:3] == '/v/':
+            return query.path.split('/')[2]
     return url
 
 
@@ -57,44 +68,85 @@ def is_url(url):
     return False
 
 
-async def send_video(msg: Message):
-    if not is_url(msg.text):
-        await app.send_message(
-            chat_id=msg.chat.id,
-            reply_to_message_id=msg.id,
-            text="Сообщение не является ссылкой"
-        )
-        return
-    video_id = get_video_id(msg.text)
-    filename = video_id + '.mp4'
-    await app.send_message(
-        chat_id=msg.chat.id,
-        reply_to_message_id=msg.id,
-        text="Обработка запроса"
-    )
-    if os.path.exists(os.path.join(path + filename)):
-        video = os.path.join(path + filename)
-        await app.send_document(
-            chat_id=msg.chat.id,
-            reply_to_message_id=msg.id,
-            document=video,
-            file_name=filename
-        )
-        return
-    video = await loop.run_in_executor(
-        executor=None,
-        func=partial(
-            YouTube(msg.text).streams.filter(file_extension='mp4').first().download,
-            output_path=path,
-            filename=filename
-        )
-    )
-    await app.send_document(
-        chat_id=msg.chat.id,
-        reply_to_message_id=msg.id,
-        document=video,
-        file_name=filename
-    )
+CHUNK_SIZE = 3 * 2 ** 20  # bytes
+
+
+async def download_video(client, video_url, filename, bot_msg):
+    stream = YouTube(video_url).streams.filter(progressive=False, file_extension='mp4', mime_type='video/mp4')\
+        .order_by('resolution').desc().first()
+    url = stream.url
+    file_size = stream.filesize
+
+    ranges = [[url, i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE - 1] for i in range(ceil(file_size / CHUNK_SIZE))]
+    ranges[-1][2] = None  # Last range must be to the end of file, so it will be marked as None.
+
+    pool = mp.Pool(min(len(ranges), 60))
+    chunks = [0 for _ in ranges]
+
+    for i, chunk_tuple in enumerate(pool.imap_unordered(download_chunk, enumerate(ranges)), 1):
+        idx, chunk = chunk_tuple
+        chunks[idx] = chunk
+        try:
+            await app.edit_message_text(text='\rСкачивание видео: {0:%}'.format(i / len(ranges)),
+                                        chat_id=bot_msg.chat.id, message_id=bot_msg.id)
+        except:
+            pass
+
+    with open(filename, 'wb') as outfile:
+        for chunk in chunks:
+            outfile.write(chunk)
+
+
+async def download_audio(client, video_url, filename, bot_msg):
+    stream = YouTube(video_url).streams.filter(only_audio=True, mime_type='audio/mp4').order_by('abr').desc().first()
+    url = stream.url
+    file_size = stream.filesize
+
+    ranges = [[url, i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE - 1] for i in range(ceil(file_size / CHUNK_SIZE))]
+    ranges[-1][2] = None  # Last range must be to the end of file, so it will be marked as None.
+
+    pool = mp.Pool(min(len(ranges), 60))
+    chunks = [0 for _ in ranges]
+
+    for i, chunk_tuple in enumerate(pool.imap_unordered(download_chunk, enumerate(ranges)), 1):
+        idx, chunk = chunk_tuple
+        chunks[idx] = chunk
+        try:
+            await app.edit_message_text(text='\rСкачивание аудио: {0:%}'.format(i / len(ranges)),
+                                        chat_id=bot_msg.chat.id, message_id=bot_msg.id)
+        except:
+            pass
+
+    with open(filename, 'wb') as outfile:
+        for chunk in chunks:
+            outfile.write(chunk)
+
+
+def download_chunk(args):
+    idx, args = args
+    url, start, finish = args
+    range_string = '{}-'.format(start)
+
+    if finish is not None:
+        range_string += str(finish)
+
+    response = requests.get(url, headers={'Range': 'bytes=' + range_string})
+    return idx, response.content
+
+
+async def download(video_url, video_id, bot_msg):
+    video_filename = video_id + '_video.mp4'
+    audio_filename = video_id + '_audio.mp4'
+    output_filename = video_id + '.mp4'
+    await download_video(client=app, video_url=video_url, filename=video_filename, bot_msg=bot_msg)
+    await download_audio(client=app ,video_url=video_url, filename=audio_filename, bot_msg=bot_msg)
+    video_stream = ffmpeg.input(video_filename)
+    audio_stream = ffmpeg.input(audio_filename)
+    ffmpeg.output(audio_stream, video_stream, output_filename).run()
+    os.remove(video_filename)
+    os.remove(audio_filename)
+
+    return output_filename
 
 
 @app.on_message(filters.command("start"))
@@ -108,7 +160,36 @@ async def start_message(client, message: Message):
 
 @app.on_message()
 async def download_video(client, msg: Message):
-    await send_video(msg)
+    if not is_url(msg.text):
+        await app.send_message(
+            chat_id=msg.chat.id,
+            reply_to_message_id=msg.id,
+            text="Сообщение не является ссылкой"
+        )
+        return
+    video_id = get_video_id(msg.text)
+    filename = video_id + '.mp4'
+    bot_msg: Message = await app.send_message(
+        chat_id=msg.chat.id,
+        reply_to_message_id=msg.id,
+        text="Обработка запроса"
+    )
+    if os.path.exists(os.path.join(path + filename)):
+        video = os.path.join(path + filename)
+        await app.send_document(
+            chat_id=msg.chat.id,
+            reply_to_message_id=msg.id,
+            document=video,
+            file_name=filename
+        )
+        return
+    video = await download(msg.text, get_video_id(msg.text), bot_msg)
+    await app.send_document(
+        chat_id=msg.chat.id,
+        reply_to_message_id=msg.id,
+        document=video,
+        file_name=filename
+    )
 
 
 if __name__ == '__main__':

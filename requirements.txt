@@ -1,3 +1,5 @@
 pytube
 pyrogram
 tgcrypto
+requests
+ffmpeg
