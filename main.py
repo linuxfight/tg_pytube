@@ -42,7 +42,6 @@ def login():
 
 app = login()
 path = os.path.join(os.getcwd() + '/videos/')
-loop = asyncio.get_event_loop()
 
 
 def get_video_id(url: str):
@@ -80,7 +79,7 @@ async def download_video(client, video_url, filename, bot_msg):
     ranges = [[url, i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE - 1] for i in range(ceil(file_size / CHUNK_SIZE))]
     ranges[-1][2] = None  # Last range must be to the end of file, so it will be marked as None.
 
-    pool = mp.Pool(min(len(ranges), 60))
+    pool = mp.Pool(min(len(ranges), 48))
     chunks = [0 for _ in ranges]
 
     for i, chunk_tuple in enumerate(pool.imap_unordered(download_chunk, enumerate(ranges)), 1):
@@ -92,7 +91,7 @@ async def download_video(client, video_url, filename, bot_msg):
         except:
             pass
 
-    with open(filename, 'wb') as outfile:
+    with open(path + filename, 'wb') as outfile:
         for chunk in chunks:
             outfile.write(chunk)
 
@@ -105,7 +104,7 @@ async def download_audio(client, video_url, filename, bot_msg):
     ranges = [[url, i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE - 1] for i in range(ceil(file_size / CHUNK_SIZE))]
     ranges[-1][2] = None  # Last range must be to the end of file, so it will be marked as None.
 
-    pool = mp.Pool(min(len(ranges), 60))
+    pool = mp.Pool(min(len(ranges), 48))
     chunks = [0 for _ in ranges]
 
     for i, chunk_tuple in enumerate(pool.imap_unordered(download_chunk, enumerate(ranges)), 1):
@@ -117,7 +116,7 @@ async def download_audio(client, video_url, filename, bot_msg):
         except:
             pass
 
-    with open(filename, 'wb') as outfile:
+    with open(path + filename, 'wb') as outfile:
         for chunk in chunks:
             outfile.write(chunk)
 
@@ -138,8 +137,8 @@ async def download(video_url, video_id, bot_msg):
     video_filename = video_id + '_video.mp4'
     audio_filename = video_id + '_audio.mp4'
     output_filename = video_id + '.mp4'
+    await download_audio(client=app, video_url=video_url, filename=audio_filename, bot_msg=bot_msg)
     await download_video(client=app, video_url=video_url, filename=video_filename, bot_msg=bot_msg)
-    await download_audio(client=app ,video_url=video_url, filename=audio_filename, bot_msg=bot_msg)
     video_stream = ffmpeg.input(video_filename)
     audio_stream = ffmpeg.input(audio_filename)
     ffmpeg.output(audio_stream, video_stream, output_filename).run()
@@ -159,7 +158,7 @@ async def start_message(client, message: Message):
 
 
 @app.on_message()
-async def download_video(client, msg: Message):
+async def on_link(client, msg: Message):
     if not is_url(msg.text):
         await app.send_message(
             chat_id=msg.chat.id,
