@@ -79,7 +79,7 @@ async def download_video(client, video_url, filename, bot_msg):
     ranges = [[url, i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE - 1] for i in range(ceil(file_size / CHUNK_SIZE))]
     ranges[-1][2] = None  # Last range must be to the end of file, so it will be marked as None.
 
-    pool = mp.Pool(min(len(ranges), 48))
+    pool = mp.Pool(min(len(ranges), 32))
     chunks = [0 for _ in ranges]
 
     for i, chunk_tuple in enumerate(pool.imap_unordered(download_chunk, enumerate(ranges)), 1):
@@ -104,7 +104,7 @@ async def download_audio(client, video_url, filename, bot_msg):
     ranges = [[url, i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE - 1] for i in range(ceil(file_size / CHUNK_SIZE))]
     ranges[-1][2] = None  # Last range must be to the end of file, so it will be marked as None.
 
-    pool = mp.Pool(min(len(ranges), 48))
+    pool = mp.Pool(min(len(ranges), 32))
     chunks = [0 for _ in ranges]
 
     for i, chunk_tuple in enumerate(pool.imap_unordered(download_chunk, enumerate(ranges)), 1):
@@ -139,11 +139,13 @@ async def download(video_url, video_id, bot_msg):
     output_filename = video_id + '.mp4'
     await download_audio(client=app, video_url=video_url, filename=audio_filename, bot_msg=bot_msg)
     await download_video(client=app, video_url=video_url, filename=video_filename, bot_msg=bot_msg)
-    video_stream = ffmpeg.input(video_filename)
-    audio_stream = ffmpeg.input(audio_filename)
-    ffmpeg.output(audio_stream, video_stream, output_filename).run()
+    await app.edit_message_text(chat_id=bot_msg.chat.id, message_id=bot_msg.id, text='Соединение аудио и видео, пожалуйста подождите')
+    video_stream = ffmpeg.input(path + video_filename)
+    audio_stream = ffmpeg.input(path + audio_filename)
+    ffmpeg.output(audio_stream, video_stream, path + output_filename).run()
     os.remove(video_filename)
     os.remove(audio_filename)
+    await app.delete_messages(chat_id=bot_msg.chat.id, message_ids=bot_msg.id)
 
     return output_filename
 
