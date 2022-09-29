@@ -22,7 +22,8 @@ def config(key):
         data = {
             'bot_token': 'BOT_TOKEN',
             'api_hash': 'API_HASH',
-            'api_id': 'API_ID'
+            'api_id': 'API_ID',
+            'threads': 32
         }
         open("config.txt", 'w').write(json.dumps(data))
         quit(0)
@@ -73,7 +74,7 @@ async def download_video(client, video_url, filename, bot_msg):
     ranges = [[url, i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE - 1] for i in range(ceil(file_size / CHUNK_SIZE))]
     ranges[-1][2] = None  # Last range must be to the end of file, so it will be marked as None.
 
-    pool = mp.Pool(min(len(ranges), 32))
+    pool = mp.Pool(min(len(ranges), config('threads')))
     chunks = [0 for _ in ranges]
 
     for i, chunk_tuple in enumerate(pool.imap_unordered(download_chunk, enumerate(ranges)), 1):
@@ -98,7 +99,7 @@ async def download_audio(client, video_url, filename, bot_msg):
     ranges = [[url, i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE - 1] for i in range(ceil(file_size / CHUNK_SIZE))]
     ranges[-1][2] = None  # Last range must be to the end of file, so it will be marked as None.
 
-    pool = mp.Pool(min(len(ranges), 32))
+    pool = mp.Pool(min(len(ranges), config('threads')))
     chunks = [0 for _ in ranges]
 
     for i, chunk_tuple in enumerate(pool.imap_unordered(download_chunk, enumerate(ranges)), 1):
@@ -182,14 +183,13 @@ async def on_link(client, msg: Message):
             file_name=filename
         )
         return
-    video = await download(msg.text, get_video_id(msg.text), bot_msg)
-    await app.delete_messages(chat_id=bot_msg.chat.id, message_ids=bot_msg.id)
-    await app.send_document(
+    video = await app.send_document(
         chat_id=msg.chat.id,
         reply_to_message_id=msg.id,
-        document=video,
+        document=await download(msg.text, get_video_id(msg.text), bot_msg),
         file_name=filename
     )
+    await app.delete_messages(chat_id=bot_msg.chat.id, message_ids=bot_msg.id)
 
 
 if __name__ == '__main__':
