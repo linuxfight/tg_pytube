@@ -55,7 +55,6 @@ def login():
 
 
 app = login()
-path = os.path.join(os.getcwd() + '/videos/')
 storage = load()
 
 
@@ -149,8 +148,7 @@ async def download(video_url, video_id, bot_msg):
     output_filename = video_id + '.mp4'
     await download_audio(client=app, video_url=video_url, filename=audio_filename, bot_msg=bot_msg)
     await download_video(client=app, video_url=video_url, filename=video_filename, bot_msg=bot_msg)
-    command: str = 'ffmpeg -i ' + video_filename + ' -i ' + audio_filename + ' -c:v copy -c:a copy ' + output_filename
-    #await app.edit_message_text(chat_id=bot_msg.chat.id, message_id=bot_msg.id, text='Соединение аудио и видео, пожалуйста подождите')
+    command: str = 'ffmpeg -i ' + video_filename + ' -i ' + audio_filename + ' -c:v copy -c:a copy ' + output_filename + ' -hide_banner -loglevel error'
     thread = Thread(group=None, target=lambda:os.system(command))
     thread.run()
     while thread.is_alive():
@@ -161,7 +159,6 @@ async def download(video_url, video_id, bot_msg):
         await app.edit_message_text(chat_id=bot_msg.chat.id, message_id=bot_msg.id, text='Готово!')
 
         return output_filename
-    #ffmpeg -i videoplayback.mp4 -i videoplayback.mp4 -c:v copy -c:a copy output.mp4
 
 
 @app.on_message(filters.command("start"))
