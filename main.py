@@ -1,17 +1,15 @@
 import os
 import json
 import re
-import requests
+
+import httpx
 
 
 from threading import Thread
-from urllib.parse import urlparse
 from os.path import exists
 from pytube import YouTube
 from pyrogram import Client, filters
 from pyrogram.types import Message
-import multiprocessing as mp
-from math import ceil
 
 
 def config(key):
@@ -22,8 +20,7 @@ def config(key):
         data = {
             'bot_token': 'BOT_TOKEN',
             'api_hash': 'API_HASH',
-            'api_id': 'API_ID',
-            'threads': 32
+            'api_id': 'API_ID'
         }
         open("config.txt", 'w').write(json.dumps(data))
         quit(0)
@@ -76,70 +73,36 @@ def is_url(url):
     return False
 
 
-CHUNK_SIZE = 3 * 2 ** 20  # bytes
+#CHUNK_SIZE = 3 * 2 ** 20  # bytes
+chunk_size = 3145728
 
 
 async def download_video(client, video_url, filename, bot_msg):
     stream = YouTube(video_url).streams.filter(progressive=False, file_extension='mp4', mime_type='video/mp4')\
         .order_by('resolution').desc().first()
     url = stream.url
-    file_size = stream.filesize
 
-    ranges = [[url, i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE - 1] for i in range(ceil(file_size / CHUNK_SIZE))]
-    ranges[-1][2] = None  # Last range must be to the end of file, so it will be marked as None.
-
-    pool = mp.Pool(min(len(ranges), int(config('threads'))))
-    chunks = [0 for _ in ranges]
-
-    for i, chunk_tuple in enumerate(pool.imap_unordered(download_chunk, enumerate(ranges)), 1):
-        idx, chunk = chunk_tuple
-        chunks[idx] = chunk
-        try:
-            await app.edit_message_text(text='\rСкачивание видео: {0:%}'.format(i / len(ranges)),
-                                        chat_id=bot_msg.chat.id, message_id=bot_msg.id)
-        except:
-            pass
+    await app.edit_message_text(chat_id=bot_msg.chat.id, message_id=bot_msg.id,
+                                text="Скачивание видео, пожалуйста подождите")
 
     with open(filename, 'wb') as outfile:
-        for chunk in chunks:
-            outfile.write(chunk)
+        async with httpx.AsyncClient() as client:
+            async with client.stream('GET', url) as response:
+                async for chunk in response.aiter_bytes(chunk_size=chunk_size):
+                    outfile.write(chunk)
 
 
 async def download_audio(client, video_url, filename, bot_msg):
     stream = YouTube(video_url).streams.filter(only_audio=True, mime_type='audio/mp4').order_by('abr').desc().first()
     url = stream.url
-    file_size = stream.filesize
 
-    ranges = [[url, i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE - 1] for i in range(ceil(file_size / CHUNK_SIZE))]
-    ranges[-1][2] = None  # Last range must be to the end of file, so it will be marked as None.
-
-    pool = mp.Pool(min(len(ranges), int(config('threads'))))
-    chunks = [0 for _ in ranges]
-
-    for i, chunk_tuple in enumerate(pool.imap_unordered(download_chunk, enumerate(ranges)), 1):
-        idx, chunk = chunk_tuple
-        chunks[idx] = chunk
-        try:
-            await app.edit_message_text(text='\rСкачивание аудио: {0:%}'.format(i / len(ranges)),
-                                        chat_id=bot_msg.chat.id, message_id=bot_msg.id)
-        except:
-            pass
+    await app.edit_message_text(chat_id=bot_msg.chat.id, message_id=bot_msg.id, text="Скачивание аудио, пожалуйста подождите")
 
     with open(filename, 'wb') as outfile:
-        for chunk in chunks:
-            outfile.write(chunk)
-
-
-def download_chunk(args):
-    idx, args = args
-    url, start, finish = args
-    range_string = '{}-'.format(start)
-
-    if finish is not None:
-        range_string += str(finish)
-
-    response = requests.get(url, headers={'Range': 'bytes=' + range_string})
-    return idx, response.content
+        async with httpx.AsyncClient() as client:
+            async with client.stream('GET', url) as response:
+                async for chunk in response.aiter_bytes(chunk_size=chunk_size):
+                    outfile.write(chunk)
 
 
 async def download(video_url, video_id, bot_msg):
