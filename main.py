@@ -1,7 +1,6 @@
 import os
 import json
 import re
-
 import httpx
 
 
@@ -73,17 +72,14 @@ def is_url(url):
     return False
 
 
-#CHUNK_SIZE = 3 * 2 ** 20  # bytes
 chunk_size = 3145728
 
 
-async def download_video(client, video_url, filename, bot_msg):
+async def download_video(video_url):
     stream = YouTube(video_url).streams.filter(progressive=False, file_extension='mp4', mime_type='video/mp4')\
         .order_by('resolution').desc().first()
     url = stream.url
-
-    await app.edit_message_text(chat_id=bot_msg.chat.id, message_id=bot_msg.id,
-                                text="Скачивание видео, пожалуйста подождите")
+    filename = get_video_id(video_url) + '_video.mp4'
 
     with open(filename, 'wb') as outfile:
         async with httpx.AsyncClient() as client:
@@ -91,12 +87,13 @@ async def download_video(client, video_url, filename, bot_msg):
                 async for chunk in response.aiter_bytes(chunk_size=chunk_size):
                     outfile.write(chunk)
 
+    return filename
 
-async def download_audio(client, video_url, filename, bot_msg):
+
+async def download_audio(video_url):
     stream = YouTube(video_url).streams.filter(only_audio=True, mime_type='audio/mp4').order_by('abr').desc().first()
     url = stream.url
-
-    await app.edit_message_text(chat_id=bot_msg.chat.id, message_id=bot_msg.id, text="Скачивание аудио, пожалуйста подождите")
+    filename = get_video_id(video_url) + '_audio.mp4'
 
     with open(filename, 'wb') as outfile:
         async with httpx.AsyncClient() as client:
@@ -104,13 +101,13 @@ async def download_audio(client, video_url, filename, bot_msg):
                 async for chunk in response.aiter_bytes(chunk_size=chunk_size):
                     outfile.write(chunk)
 
+    return filename
 
-async def download(video_url, video_id, bot_msg):
-    video_filename = video_id + '_video.mp4'
-    audio_filename = video_id + '_audio.mp4'
-    output_filename = video_id + '.mp4'
-    await download_audio(client=app, video_url=video_url, filename=audio_filename, bot_msg=bot_msg)
-    await download_video(client=app, video_url=video_url, filename=video_filename, bot_msg=bot_msg)
+
+async def download(video_url, bot_msg):
+    video_filename = await download_video(video_url=video_url)
+    audio_filename = await download_audio(video_url=video_url)
+    output_filename = get_video_id(video_url) + '.mp4'
     command: str = 'ffmpeg -i ' + video_filename + ' -i ' + audio_filename + ' -c:v copy -c:a copy ' + output_filename + ' -hide_banner -loglevel error'
     thread = Thread(group=None, target=lambda:os.system(command))
     thread.run()
@@ -162,7 +159,7 @@ async def on_link(client, msg: Message):
     video = await app.send_document(
         chat_id=msg.chat.id,
         reply_to_message_id=msg.id,
-        document=await download(msg.text, get_video_id(msg.text), bot_msg),
+        document=await download(msg.text, bot_msg),
         file_name=filename
     )
     file_id = None
