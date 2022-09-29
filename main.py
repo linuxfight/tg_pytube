@@ -29,6 +29,20 @@ def config(key):
         quit(0)
 
 
+def load():
+    if exists("save.json"):
+        data = open("save.json", 'r').read()
+        return json.loads(data)
+    else:
+        data = {}
+        open("save.json", 'w').write(json.dumps(data))
+        return load()
+
+
+def save(self):
+    open("save.json", 'w').write(json.dumps(self))
+
+
 def login():
     if exists("tgdl_bot.session"):
         return Client("tgdl_bot")
@@ -42,6 +56,7 @@ def login():
 
 app = login()
 path = os.path.join(os.getcwd() + '/videos/')
+storage = load()
 
 
 def get_video_id(url: str):
@@ -74,7 +89,7 @@ async def download_video(client, video_url, filename, bot_msg):
     ranges = [[url, i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE - 1] for i in range(ceil(file_size / CHUNK_SIZE))]
     ranges[-1][2] = None  # Last range must be to the end of file, so it will be marked as None.
 
-    pool = mp.Pool(min(len(ranges), config('threads')))
+    pool = mp.Pool(min(len(ranges), int(config('threads'))))
     chunks = [0 for _ in ranges]
 
     for i, chunk_tuple in enumerate(pool.imap_unordered(download_chunk, enumerate(ranges)), 1):
@@ -99,7 +114,7 @@ async def download_audio(client, video_url, filename, bot_msg):
     ranges = [[url, i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE - 1] for i in range(ceil(file_size / CHUNK_SIZE))]
     ranges[-1][2] = None  # Last range must be to the end of file, so it will be marked as None.
 
-    pool = mp.Pool(min(len(ranges), config('threads')))
+    pool = mp.Pool(min(len(ranges), int(config('threads'))))
     chunks = [0 for _ in ranges]
 
     for i, chunk_tuple in enumerate(pool.imap_unordered(download_chunk, enumerate(ranges)), 1):
@@ -139,7 +154,7 @@ async def download(video_url, video_id, bot_msg):
     thread = Thread(group=None, target=lambda:os.system(command))
     thread.run()
     while thread.is_alive():
-        print("Working")
+        pass
     else:
         os.remove(video_filename)
         os.remove(audio_filename)
@@ -174,14 +189,15 @@ async def on_link(client, msg: Message):
         reply_to_message_id=msg.id,
         text="Обработка запроса"
     )
-    if os.path.exists(os.path.join(path + filename)):
-        video = os.path.join(path + filename)
+    if get_video_id(msg.text) in storage:
+        video = storage[get_video_id(msg.text)]
         await app.send_document(
             chat_id=msg.chat.id,
             reply_to_message_id=msg.id,
             document=video,
             file_name=filename
         )
+        await app.delete_messages(chat_id=bot_msg.chat.id, message_ids=bot_msg.id)
         return
     video = await app.send_document(
         chat_id=msg.chat.id,
@@ -189,6 +205,15 @@ async def on_link(client, msg: Message):
         document=await download(msg.text, get_video_id(msg.text), bot_msg),
         file_name=filename
     )
+    file_id = None
+    if video.document.file_id:
+        file_id = video.document.file_id
+    else:
+        file_id = video.video.file_id
+    storage.update({f'{get_video_id(msg.text)}': file_id})
+    video_path = get_video_id(msg.text) + '.mp4'
+    os.remove(video_path)
+    save(storage)
     await app.delete_messages(chat_id=bot_msg.chat.id, message_ids=bot_msg.id)
 
 
