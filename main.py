@@ -1,4 +1,3 @@
-import asyncio
 import os
 import json
 import re
@@ -107,8 +106,8 @@ async def download_audio(video_url):
 
 
 async def download(video_url, bot_msg):
-    video_filename = Thread(group=None, target=asyncio.run, args=download_video(video_url=video_url))
-    audio_filename = Thread(group=None, target=asyncio.run, args=download_audio(video_url=video_url))
+    video_filename = await download_video(video_url=video_url)
+    audio_filename = await download_audio(video_url=video_url)
     output_filename = get_video_id(video_url) + '.mp4'
     command: str = 'ffmpeg -i ' + video_filename + ' -i ' \
                    + audio_filename + ' -c:v copy -c:a copy ' + output_filename + ' -hide_banner -loglevel error'
