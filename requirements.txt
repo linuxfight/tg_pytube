@@ -1,4 +1,4 @@
 pytube
 pyrogram
 tgcrypto
-requests
+httpx
