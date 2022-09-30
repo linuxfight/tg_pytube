@@ -2,6 +2,7 @@ import os
 import json
 import re
 import httpx
+import aiofiles
 
 
 from threading import Thread
@@ -82,11 +83,11 @@ async def download_video(video_url):
     url = stream.url
     filename = get_video_id(video_url) + '_video.mp4'
 
-    with open(filename, 'wb') as outfile:
+    async with aiofiles.open(filename, 'wb') as outfile:
         async with httpx.AsyncClient() as client:
             async with client.stream('GET', url) as response:
                 async for chunk in response.aiter_bytes(chunk_size=chunk_size):
-                    outfile.write(chunk)
+                    await outfile.write(chunk)
 
     return filename
 
@@ -96,11 +97,11 @@ async def download_audio(video_url):
     url = stream.url
     filename = get_video_id(video_url) + '_audio.mp4'
 
-    with open(filename, 'wb') as outfile:
+    async with aiofiles.open(filename, 'wb') as outfile:
         async with httpx.AsyncClient() as client:
             async with client.stream('GET', url) as response:
                 async for chunk in response.aiter_bytes(chunk_size=chunk_size):
-                    outfile.write(chunk)
+                    await outfile.write(chunk)
 
     return filename
 

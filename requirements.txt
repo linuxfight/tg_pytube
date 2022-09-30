@@ -2,3 +2,4 @@ pytube
 pyrogram
 tgcrypto
 httpx
+aiofiles
