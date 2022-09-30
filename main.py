@@ -1,15 +1,15 @@
+import asyncio
 import os
 import json
 import re
-import requests
+import httpx
+
 
 from threading import Thread
 from os.path import exists
 from pytube import YouTube
 from pyrogram import Client, filters
 from pyrogram.types import Message
-import multiprocessing as mp
-from math import ceil
 
 
 def config(key):
@@ -20,8 +20,7 @@ def config(key):
         data = {
             'bot_token': 'BOT_TOKEN',
             'api_hash': 'API_HASH',
-            'api_id': 'API_ID',
-            'threads': 4
+            'api_id': 'API_ID'
         }
         open("config.txt", 'w').write(json.dumps(data))
         quit(0)
@@ -70,85 +69,48 @@ def get_video_id(url: str):
 def is_url(url):
     match_obj = re.match(r'^((?:https?:)?//)?((?:www|m)\.)?(youtube(-nocookie)?\.com|youtu.be)(/(?:[\w\-]+\?v=|embed/|v'
                          r'/)?)([\w\-]+)(\S+)?$', url)
-    result = False
     if match_obj:
-        result = True
-    return result
+         return True
+    return False
 
 
-CHUNK_SIZE = 3 * 2 ** 20  # bytes
+chunk_size = 3145728
 
 
-async def download_video(client, video_url, filename, bot_msg):
-    stream = YouTube(video_url).streams.filter(progressive=False, file_extension='mp4', mime_type='video/mp4') \
+async def download_video(video_url):
+    stream = YouTube(video_url).streams.filter(progressive=False, file_extension='mp4', mime_type='video/mp4')\
         .order_by('resolution').desc().first()
     url = stream.url
-    file_size = stream.filesize
-
-    ranges = [[url, i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE - 1] for i in range(ceil(file_size / CHUNK_SIZE))]
-    ranges[-1][2] = None  # Last range must be to the end of file, so it will be marked as None.
-
-    pool = mp.Pool(min(len(ranges), int(config('threads'))))
-    chunks = [0 for _ in ranges]
-
-    for i, chunk_tuple in enumerate(pool.imap_unordered(download_chunk, enumerate(ranges)), 1):
-        idx, chunk = chunk_tuple
-        chunks[idx] = chunk
-        try:
-            await app.edit_message_text(text='\rСкачивание видео: {0:%}'.format(i / len(ranges)),
-                                        chat_id=bot_msg.chat.id, message_id=bot_msg.id)
-        except:
-            pass
+    filename = get_video_id(video_url) + '_video.mp4'
 
     with open(filename, 'wb') as outfile:
-        for chunk in chunks:
-            outfile.write(chunk)
+        async with httpx.AsyncClient() as client:
+            async with client.stream('GET', url) as response:
+                async for chunk in response.aiter_bytes(chunk_size=chunk_size):
+                    outfile.write(chunk)
+
+    return filename
 
 
-async def download_audio(client, video_url, filename, bot_msg):
+async def download_audio(video_url):
     stream = YouTube(video_url).streams.filter(only_audio=True, mime_type='audio/mp4').order_by('abr').desc().first()
     url = stream.url
-    file_size = stream.filesize
-
-    ranges = [[url, i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE - 1] for i in range(ceil(file_size / CHUNK_SIZE))]
-    ranges[-1][2] = None  # Last range must be to the end of file, so it will be marked as None.
-
-    pool = mp.Pool(min(len(ranges), int(config('threads'))))
-    chunks = [0 for _ in ranges]
-
-    for i, chunk_tuple in enumerate(pool.imap_unordered(download_chunk, enumerate(ranges)), 1):
-        idx, chunk = chunk_tuple
-        chunks[idx] = chunk
-        try:
-            await app.edit_message_text(text='\rСкачивание аудио: {0:%}'.format(i / len(ranges)),
-                                        chat_id=bot_msg.chat.id, message_id=bot_msg.id)
-        except:
-            pass
+    filename = get_video_id(video_url) + '_audio.mp4'
 
     with open(filename, 'wb') as outfile:
-        for chunk in chunks:
-            outfile.write(chunk)
+        async with httpx.AsyncClient() as client:
+            async with client.stream('GET', url) as response:
+                async for chunk in response.aiter_bytes(chunk_size=chunk_size):
+                    outfile.write(chunk)
+
+    return filename
 
 
-def download_chunk(args):
-    idx, args = args
-    url, start, finish = args
-    range_string = '{}-'.format(start)
-
-    if finish is not None:
-        range_string += str(finish)
-
-    response = requests.get(url, headers={'Range': 'bytes=' + range_string})
-    return idx, response.content
-
-
-async def download(video_url, video_id, bot_msg):
-    video_filename = video_id + '_video.mp4'
-    audio_filename = video_id + '_audio.mp4'
-    output_filename = video_id + '.mp4'
-    await download_audio(client=app, video_url=video_url, filename=audio_filename, bot_msg=bot_msg)
-    await download_video(client=app, video_url=video_url, filename=video_filename, bot_msg=bot_msg)
-    command: str = 'ffmpeg -i ' + video_filename + ' -i '\
+async def download(video_url, bot_msg):
+    video_filename = Thread(group=None, target=asyncio.run, args=download_video(video_url=video_url))
+    audio_filename = Thread(group=None, target=asyncio.run, args=download_audio(video_url=video_url))
+    output_filename = get_video_id(video_url) + '.mp4'
+    command: str = 'ffmpeg -i ' + video_filename + ' -i ' \
                    + audio_filename + ' -c:v copy -c:a copy ' + output_filename + ' -hide_banner -loglevel error'
     thread = Thread(group=None, target=lambda: os.system(command))
     thread.run()
@@ -157,6 +119,7 @@ async def download(video_url, video_id, bot_msg):
     else:
         os.remove(video_filename)
         os.remove(audio_filename)
+        await app.edit_message_text(chat_id=bot_msg.chat.id, message_id=bot_msg.id, text='Готово!')
 
         return output_filename
 
@@ -199,7 +162,7 @@ async def on_link(client, msg: Message):
     video = await app.send_document(
         chat_id=msg.chat.id,
         reply_to_message_id=msg.id,
-        document=await download(msg.text, get_video_id(msg.text), bot_msg),
+        document=await download(msg.text, bot_msg),
         file_name=filename
     )
     file_id = None
