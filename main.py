@@ -1,3 +1,4 @@
+import asyncio
 import os
 import json
 import re
@@ -22,8 +23,7 @@ def config(key):
         data = {
             'bot_token': 'BOT_TOKEN',
             'api_hash': 'API_HASH',
-            'api_id': 'API_ID',
-            'chunk_size': 10485760
+            'api_id': 'API_ID'
         }
         open("config.txt", 'w').write(json.dumps(data))
         quit(0)
@@ -77,48 +77,68 @@ def is_url(url):
     return False
 
 
-async def download_video(video_url):
+async def download_video(video_url, bot_msg):
     stream = YouTube(video_url).streams.filter(progressive=False, file_extension='mp4', mime_type='video/mp4')\
         .order_by('resolution').desc().first()
     url = stream.url
     filename = get_video_id(video_url) + '_video.mp4'
+    file_size = stream.filesize
+    chunk_size = int(file_size / 200)
+    chunks = []
+
+    async with httpx.AsyncClient() as client:
+        async with client.stream('GET', url) as response:
+            total_length = response.headers.get('content-length')
+            dl = 0
+            total_length = int(total_length)
+            async for chunk in response.aiter_bytes(chunk_size=chunk_size):
+                dl += len(chunk)
+                await app.edit_message_text(
+                    text="Video: " + str((100 * dl / total_length) / 1),
+                    chat_id=bot_msg.chat.id,
+                    message_id=bot_msg.id
+                )
+                chunks.append(chunk)
 
     async with aiofiles.open(filename, 'wb') as outfile:
-        async with httpx.AsyncClient() as client:
-            async with client.stream('GET', url) as response:
-                total_length = response.headers.get('content-length')
-                dl = 0
-                total_length = int(total_length)
-                async for chunk in response.aiter_bytes(chunk_size=int(config('chunk_size'))):
-                    dl += len(chunk)
-                    sys.stdout.write("Video: " + str((100 * dl / total_length) / 1) + '\n')
-                    await outfile.write(chunk)
+        for chunk in chunks:
+            await outfile.write(chunk)
 
     return filename
 
 
-async def download_audio(video_url):
+async def download_audio(video_url, bot_msg):
     stream = YouTube(video_url).streams.filter(only_audio=True, mime_type='audio/mp4').order_by('abr').desc().first()
     url = stream.url
     filename = get_video_id(video_url) + '_audio.mp4'
+    file_size = stream.filesize
+    chunk_size = int(file_size / 20)
+    chunks = []
+
+    async with httpx.AsyncClient() as client:
+        async with client.stream('GET', url) as response:
+            total_length = response.headers.get('content-length')
+            dl = 0
+            total_length = int(total_length)
+            async for chunk in response.aiter_bytes(chunk_size=chunk_size):
+                dl += len(chunk)
+                await app.edit_message_text(
+                    text="Audio: " + str((100 * dl / total_length) / 1),
+                    chat_id=bot_msg.chat.id,
+                    message_id=bot_msg.id
+                )
+                chunks.append(chunk)
 
     async with aiofiles.open(filename, 'wb') as outfile:
-        async with httpx.AsyncClient() as client:
-            async with client.stream('GET', url) as response:
-                total_length = response.headers.get('content-length')
-                dl = 0
-                total_length = int(total_length)
-                async for chunk in response.aiter_bytes(chunk_size=int(config('chunk_size'))):
-                    dl += len(chunk)
-                    sys.stdout.write("Audio: " + str((100 * dl / total_length) / 1) + '\n')
-                    await outfile.write(chunk)
+        for chunk in chunks:
+            await outfile.write(chunk)
 
     return filename
 
 
 async def download(video_url, bot_msg):
-    video_filename = await download_video(video_url=video_url)
-    audio_filename = await download_audio(video_url=video_url)
+    video_filename = await download_video(video_url=video_url, bot_msg=bot_msg)
+    audio_filename = await download_audio(video_url=video_url, bot_msg=bot_msg)
     output_filename = get_video_id(video_url) + '.mp4'
     command: str = 'ffmpeg -i ' + video_filename + ' -i ' \
                    + audio_filename + ' -c:v copy -c:a copy ' + output_filename + ' -hide_banner -loglevel error'
@@ -131,6 +151,7 @@ async def download(video_url, bot_msg):
         os.remove(audio_filename)
         await app.edit_message_text(chat_id=bot_msg.chat.id, message_id=bot_msg.id, text='Готово!')
 
+        await asyncio.sleep(5)
         return output_filename
 
 
