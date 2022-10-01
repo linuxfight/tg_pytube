@@ -1,6 +1,8 @@
 import os
 import json
 import re
+import sys
+
 import httpx
 import aiofiles
 
@@ -20,7 +22,8 @@ def config(key):
         data = {
             'bot_token': 'BOT_TOKEN',
             'api_hash': 'API_HASH',
-            'api_id': 'API_ID'
+            'api_id': 'API_ID',
+            'chunk_size': 10485760
         }
         open("config.txt", 'w').write(json.dumps(data))
         quit(0)
@@ -74,9 +77,6 @@ def is_url(url):
     return False
 
 
-chunk_size = 3145728
-
-
 async def download_video(video_url):
     stream = YouTube(video_url).streams.filter(progressive=False, file_extension='mp4', mime_type='video/mp4')\
         .order_by('resolution').desc().first()
@@ -86,7 +86,12 @@ async def download_video(video_url):
     async with aiofiles.open(filename, 'wb') as outfile:
         async with httpx.AsyncClient() as client:
             async with client.stream('GET', url) as response:
-                async for chunk in response.aiter_bytes(chunk_size=chunk_size):
+                total_length = response.headers.get('content-length')
+                dl = 0
+                total_length = int(total_length)
+                async for chunk in response.aiter_bytes(chunk_size=config('chunk_size')):
+                    dl += len(chunk)
+                    sys.stdout.write("Video: " + str((100 * dl / total_length) / 1) + '\n')
                     await outfile.write(chunk)
 
     return filename
@@ -100,7 +105,12 @@ async def download_audio(video_url):
     async with aiofiles.open(filename, 'wb') as outfile:
         async with httpx.AsyncClient() as client:
             async with client.stream('GET', url) as response:
-                async for chunk in response.aiter_bytes(chunk_size=chunk_size):
+                total_length = response.headers.get('content-length')
+                dl = 0
+                total_length = int(total_length)
+                async for chunk in response.aiter_bytes(chunk_size=config('chunk_size')):
+                    dl += len(chunk)
+                    sys.stdout.write("Audio: " + str((100 * dl / total_length) / 1) + '\n')
                     await outfile.write(chunk)
 
     return filename
