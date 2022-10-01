@@ -89,7 +89,7 @@ async def download_video(video_url):
                 total_length = response.headers.get('content-length')
                 dl = 0
                 total_length = int(total_length)
-                async for chunk in response.aiter_bytes(chunk_size=config('chunk_size')):
+                async for chunk in response.aiter_bytes(chunk_size=int(config('chunk_size'))):
                     dl += len(chunk)
                     sys.stdout.write("Video: " + str((100 * dl / total_length) / 1) + '\n')
                     await outfile.write(chunk)
@@ -108,7 +108,7 @@ async def download_audio(video_url):
                 total_length = response.headers.get('content-length')
                 dl = 0
                 total_length = int(total_length)
-                async for chunk in response.aiter_bytes(chunk_size=config('chunk_size')):
+                async for chunk in response.aiter_bytes(chunk_size=int(config('chunk_size'))):
                     dl += len(chunk)
                     sys.stdout.write("Audio: " + str((100 * dl / total_length) / 1) + '\n')
                     await outfile.write(chunk)
