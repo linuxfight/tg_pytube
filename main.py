@@ -94,7 +94,7 @@ async def download_video(video_url, bot_msg):
             async for chunk in response.aiter_bytes(chunk_size=chunk_size):
                 dl += len(chunk)
                 await app.edit_message_text(
-                    text="Video: " + str((100 * dl / total_length) / 1),
+                    text="Video: " + str((100 * dl / total_length) // 1) + "%",
                     chat_id=bot_msg.chat.id,
                     message_id=bot_msg.id
                 )
@@ -123,7 +123,7 @@ async def download_audio(video_url, bot_msg):
             async for chunk in response.aiter_bytes(chunk_size=chunk_size):
                 dl += len(chunk)
                 await app.edit_message_text(
-                    text="Audio: " + str((100 * dl / total_length) / 1),
+                    text="Audio: " + str((100 * dl / total_length) // 1) + "%",
                     chat_id=bot_msg.chat.id,
                     message_id=bot_msg.id
                 )
