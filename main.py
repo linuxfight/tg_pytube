@@ -93,11 +93,14 @@ async def download_video(video_url, bot_msg):
             total_length = int(total_length)
             async for chunk in response.aiter_bytes(chunk_size=chunk_size):
                 dl += len(chunk)
-                await app.edit_message_text(
-                    text="Video: " + str((100 * dl / total_length) // 1) + "%",
-                    chat_id=bot_msg.chat.id,
-                    message_id=bot_msg.id
-                )
+                try:
+                    await app.edit_message_text(
+                        text="Video: " + str((100 * dl / total_length) // 1) + "%",
+                        chat_id=bot_msg.chat.id,
+                        message_id=bot_msg.id
+                    )
+                except:
+                    pass
                 chunks.append(chunk)
 
     async with aiofiles.open(filename, 'wb') as outfile:
@@ -122,11 +125,14 @@ async def download_audio(video_url, bot_msg):
             total_length = int(total_length)
             async for chunk in response.aiter_bytes(chunk_size=chunk_size):
                 dl += len(chunk)
-                await app.edit_message_text(
-                    text="Audio: " + str((100 * dl / total_length) // 1) + "%",
-                    chat_id=bot_msg.chat.id,
-                    message_id=bot_msg.id
-                )
+                try:
+                    await app.edit_message_text(
+                        text="Audio: " + str((100 * dl / total_length) // 1) + "%",
+                        chat_id=bot_msg.chat.id,
+                        message_id=bot_msg.id
+                    )
+                except:
+                    pass
                 chunks.append(chunk)
 
     async with aiofiles.open(filename, 'wb') as outfile:
