@@ -70,18 +70,20 @@ def is_url(url):
     match_obj = re.match(r'^((?:https?:)?//)?((?:www|m)\.)?(youtube(-nocookie)?\.com|youtu.be)(/(?:[\w\-]+\?v=|embed/|v'
                          r'/)?)([\w\-]+)(\S+)?$', url)
     if match_obj:
-         return True
+        return True
     return False
 
 
 async def download(video_url, bot_msg):
     info_file = 'info.json'
-    output_filename = get_video_id(video_url) + '.webm'
+    output_filename = get_video_id(video_url) + '.mp4'
+    command = f'yt-dlp -S res,ext:mp4:m4a --recode mp4 -o "{output_filename}" {video_url} --quiet'
     with yt_dlp.YoutubeDL() as ydl:
         thread = Thread(
             group=None,
-            target=lambda: ydl.download([video_url])
+            target=lambda: os.system(command)
         )
+        #ydl.download([video_url])
         info = ydl.extract_info(video_url, download=False)
     thread.run()
     while thread.is_alive():
@@ -90,10 +92,10 @@ async def download(video_url, bot_msg):
         #await app.edit_message_text(chat_id=bot_msg.chat.id, message_id=bot_msg.id, text='Готово!')
         async with aiofiles.open(info_file, 'w') as file:
             await file.write(json.dumps(ydl.sanitize_info(info)))
-        while not exists(info['title'] + f' [{get_video_id(video_url)}].webm'):
-            print()
+        while not exists(output_filename):
+            pass
         else:
-            return info['title'] + f' [{get_video_id(video_url)}].webm'
+            return output_filename
 
 
 @app.on_message(filters.command("start"))
@@ -115,7 +117,7 @@ async def on_link(client, msg: Message):
         )
         return
     video_id = get_video_id(msg.text)
-    filename = video_id + '.webm'
+    filename = video_id + '.mp4'
     bot_msg: Message = await app.send_message(
         chat_id=msg.chat.id,
         reply_to_message_id=msg.id,
