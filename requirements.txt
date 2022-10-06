@@ -1,4 +1,4 @@
-pytube
+yt-dlp
 pyrogram
 tgcrypto
 httpx

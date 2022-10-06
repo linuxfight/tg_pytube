@@ -2,15 +2,12 @@ import asyncio
 import os
 import json
 import re
-import sys
-
-import httpx
+import yt_dlp
 import aiofiles
 
 
 from threading import Thread
 from os.path import exists
-from pytube import YouTube
 from pyrogram import Client, filters
 from pyrogram.types import Message
 
@@ -77,82 +74,58 @@ def is_url(url):
     return False
 
 
-async def download_video(video_url, bot_msg):
-    stream = YouTube(video_url).streams.filter(progressive=False, file_extension='mp4', mime_type='video/mp4')\
-        .order_by('resolution').desc().first()
-    url = stream.url
-    filename = get_video_id(video_url) + '_video.mp4'
-    file_size = stream.filesize
-    chunk_size = int(file_size / 200)
-    chunks = []
+def format_selector(ctx):
+    """ Select the best video and the best audio that won't result in an mkv.
+    NOTE: This is just an example and does not handle all cases """
 
-    async with httpx.AsyncClient() as client:
-        async with client.stream('GET', url) as response:
-            total_length = response.headers.get('content-length')
-            dl = 0
-            total_length = int(total_length)
-            async for chunk in response.aiter_bytes(chunk_size=chunk_size):
-                dl += len(chunk)
-                await app.edit_message_text(
-                    text="Video: " + str((100 * dl / total_length) / 1),
-                    chat_id=bot_msg.chat.id,
-                    message_id=bot_msg.id
-                )
-                chunks.append(chunk)
+    # formats are already sorted worst to best
+    formats = ctx.get('formats')[::-1]
 
-    async with aiofiles.open(filename, 'wb') as outfile:
-        for chunk in chunks:
-            await outfile.write(chunk)
+    # acodec='none' means there is no audio
+    best_video = next(f for f in formats
+                      if f['vcodec'] != 'none' and f['acodec'] == 'none')
 
-    return filename
+    # find compatible audio extension
+    audio_ext = {'mp4': 'm4a', 'webm': 'webm'}[best_video['ext']]
+    # vcodec='none' means there is no video
+    best_audio = next(f for f in formats if (
+        f['acodec'] != 'none' and f['vcodec'] == 'none' and f['ext'] == audio_ext))
 
+    # These are the minimum required fields for a merged format
+    yield {
+        'format_id': f'{best_video["format_id"]}+{best_audio["format_id"]}',
+        'ext': best_video['ext'],
+        'requested_formats': [best_video, best_audio],
+        # Must be + separated list of protocols
+        'protocol': f'{best_video["protocol"]}+{best_audio["protocol"]}'
+    }
 
-async def download_audio(video_url, bot_msg):
-    stream = YouTube(video_url).streams.filter(only_audio=True, mime_type='audio/mp4').order_by('abr').desc().first()
-    url = stream.url
-    filename = get_video_id(video_url) + '_audio.mp4'
-    file_size = stream.filesize
-    chunk_size = int(file_size / 20)
-    chunks = []
-
-    async with httpx.AsyncClient() as client:
-        async with client.stream('GET', url) as response:
-            total_length = response.headers.get('content-length')
-            dl = 0
-            total_length = int(total_length)
-            async for chunk in response.aiter_bytes(chunk_size=chunk_size):
-                dl += len(chunk)
-                await app.edit_message_text(
-                    text="Audio: " + str((100 * dl / total_length) / 1),
-                    chat_id=bot_msg.chat.id,
-                    message_id=bot_msg.id
-                )
-                chunks.append(chunk)
-
-    async with aiofiles.open(filename, 'wb') as outfile:
-        for chunk in chunks:
-            await outfile.write(chunk)
-
-    return filename
 
 
 async def download(video_url, bot_msg):
-    video_filename = await download_video(video_url=video_url, bot_msg=bot_msg)
-    audio_filename = await download_audio(video_url=video_url, bot_msg=bot_msg)
-    output_filename = get_video_id(video_url) + '.mp4'
-    command: str = 'ffmpeg -i ' + video_filename + ' -i ' \
-                   + audio_filename + ' -c:v copy -c:a copy ' + output_filename + ' -hide_banner -loglevel error'
-    thread = Thread(group=None, target=lambda: os.system(command))
+    info_file = 'info.json'
+    ydl_opts = {
+        'format': format_selector,
+    }
+    output_filename = get_video_id(video_url) + '.webm'
+    print(ydl_opts)
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        thread = Thread(
+            group=None,
+            target=lambda: ydl.download([video_url])
+        )
+        info = ydl.extract_info(video_url, download=False)
     thread.run()
     while thread.is_alive():
         pass
     else:
-        os.remove(video_filename)
-        os.remove(audio_filename)
-        await app.edit_message_text(chat_id=bot_msg.chat.id, message_id=bot_msg.id, text='Готово!')
-
-        await asyncio.sleep(5)
-        return output_filename
+        #await app.edit_message_text(chat_id=bot_msg.chat.id, message_id=bot_msg.id, text='Готово!')
+        async with aiofiles.open(info_file, 'w') as file:
+            await file.write(json.dumps(ydl.sanitize_info(info)))
+        while not exists(info['title'] + f' [{get_video_id(video_url)}].webm'):
+            print()
+        else:
+            return info['title'] + f' [{get_video_id(video_url)}].webm'
 
 
 @app.on_message(filters.command("start"))
@@ -174,7 +147,7 @@ async def on_link(client, msg: Message):
         )
         return
     video_id = get_video_id(msg.text)
-    filename = video_id + '.mp4'
+    filename = video_id + '.webm'
     bot_msg: Message = await app.send_message(
         chat_id=msg.chat.id,
         reply_to_message_id=msg.id,
@@ -190,10 +163,11 @@ async def on_link(client, msg: Message):
         )
         await app.delete_messages(chat_id=bot_msg.chat.id, message_ids=bot_msg.id)
         return
+    video_path = await download(msg.text, bot_msg)
     video = await app.send_document(
         chat_id=msg.chat.id,
         reply_to_message_id=msg.id,
-        document=await download(msg.text, bot_msg),
+        document=video_path,
         file_name=filename
     )
     file_id = None
@@ -202,7 +176,6 @@ async def on_link(client, msg: Message):
     else:
         file_id = video.video.file_id
     storage.update({f'{get_video_id(msg.text)}': file_id})
-    video_path = get_video_id(msg.text) + '.mp4'
     os.remove(video_path)
     save(storage)
     await app.delete_messages(chat_id=bot_msg.chat.id, message_ids=bot_msg.id)
