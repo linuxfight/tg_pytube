@@ -78,9 +78,6 @@ def format_selector(ctx):
     """ Select the best video and the best audio that won't result in an mkv.
     NOTE: This is just an example and does not handle all cases """
 
-    # formats are already sorted worst to best
-    formats = ctx.get('formats')[::-1]
-
     # acodec='none' means there is no audio
     best_video = next(f for f in formats
                       if f['vcodec'] != 'none' and f['acodec'] == 'none')
@@ -99,7 +96,6 @@ def format_selector(ctx):
         # Must be + separated list of protocols
         'protocol': f'{best_video["protocol"]}+{best_audio["protocol"]}'
     }
-
 
 
 async def download(video_url, bot_msg):
