@@ -2,4 +2,3 @@ yt-dlp
 pyrogram
 tgcrypto
 httpx
-aiofiles
