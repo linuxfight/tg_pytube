@@ -1,10 +1,7 @@
-import asyncio
 import os
 import json
 import re
 import yt_dlp
-import aiofiles
-
 
 from threading import Thread
 from os.path import exists
@@ -74,24 +71,20 @@ def is_url(url):
     return False
 
 
-async def download(video_url, bot_msg):
+async def download(video_url):
     info_file = 'info.json'
-    output_filename = get_video_id(video_url) + '.mp4'
-    command = f'yt-dlp -S res,ext:mp4:m4a --recode mp4 -o "{output_filename}" {video_url} --quiet'
+    output_filename = get_video_id(video_url) + '.webm'
+    command = f'yt-dlp -o "{output_filename}" {video_url} --quiet'
+    # -S res,ext:mp4:m4a --recode mp4
     with yt_dlp.YoutubeDL() as ydl:
         thread = Thread(
             group=None,
             target=lambda: os.system(command)
         )
-        #ydl.download([video_url])
-        info = ydl.extract_info(video_url, download=False)
     thread.run()
     while thread.is_alive():
         pass
     else:
-        #await app.edit_message_text(chat_id=bot_msg.chat.id, message_id=bot_msg.id, text='Готово!')
-        async with aiofiles.open(info_file, 'w') as file:
-            await file.write(json.dumps(ydl.sanitize_info(info)))
         while not exists(output_filename):
             pass
         else:
@@ -117,7 +110,7 @@ async def on_link(client, msg: Message):
         )
         return
     video_id = get_video_id(msg.text)
-    filename = video_id + '.mp4'
+    filename = video_id + '.webm'
     bot_msg: Message = await app.send_message(
         chat_id=msg.chat.id,
         reply_to_message_id=msg.id,
@@ -133,7 +126,7 @@ async def on_link(client, msg: Message):
         )
         await app.delete_messages(chat_id=bot_msg.chat.id, message_ids=bot_msg.id)
         return
-    video_path = await download(msg.text, bot_msg)
+    video_path = await download(msg.text)
     video = await app.send_document(
         chat_id=msg.chat.id,
         reply_to_message_id=msg.id,
