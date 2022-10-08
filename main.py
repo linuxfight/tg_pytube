@@ -167,10 +167,10 @@ async def on_callback_query(client, callback_query: CallbackQuery):
 
     if f'{video_id}_{download_type}' in storage:
         video = storage[f'{video_id}_{download_type}']
-        await app.answer_callback_query(
-            callback_query_id=callback_query.id,
-            text="✅ Готово!"
-        )
+        # await app.answer_callback_query(
+        #     callback_query_id=callback_query.id,
+        #     text="✅ Готово!"
+        # )
         await app.send_document(
             chat_id=callback_query.message.chat.id,
             reply_to_message_id=callback_query.message.id,
@@ -186,10 +186,10 @@ async def on_callback_query(client, callback_query: CallbackQuery):
         document=video_path,
         file_name=filename
     )
-    await app.answer_callback_query(
-        callback_query_id=callback_query.id,
-        text="✅ Готово!"
-    )
+    # await app.answer_callback_query(
+    #     callback_query_id=callback_query.id,
+    #     text="✅ Готово!"
+    # )
     file_id = None
     if video.document.file_id:
         file_id = video.document.file_id
