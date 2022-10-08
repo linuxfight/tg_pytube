@@ -138,15 +138,17 @@ async def on_link(client, msg: Message):
         return
 
     with yt_dlp.YoutubeDL() as ydl:
-        info = ydl.extract_info(url, download=False)
+        info: dict = ydl.extract_info(url, download=False)
     title = info.get('title', None)
+    description = info.get('description', None)
 
     await app.send_message(
         chat_id=msg.chat.id,
         reply_to_message_id=msg.id,
         reply_markup=generate_keyboard(get_video_id(url)),
         text=f"Название: {title}\n"
-             f"Ссылка: {url}"
+             f"Ссылка: {url}\n"
+             f"Описание: {description}"
     )
 
 
