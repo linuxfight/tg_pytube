@@ -89,8 +89,8 @@ def generate_keyboard(video_id):
 async def download(video_url, download_type):
     info_file = 'info.json'
     video_id = get_video_id(video_url)
-    output_filename = video_id + '.webm'
-    command = f'yt-dlp -o "{output_filename}" {video_url} --quiet'
+    output_filename = video_id + '.mkv'
+    command = f'yt-dlp --merge-output-format mkv -o "{output_filename}" {video_url} --quiet'
 
     if download_type == "audio":
         output_filename = video_id + '.mp3'
@@ -157,7 +157,7 @@ async def on_callback_query(client, callback_query: CallbackQuery):
     data = callback_query.data.split(':')
     video_id = data[0]
     download_type = data[1]
-    filename = video_id + '.webm'
+    filename = video_id + '.mkv'
     if download_type == 'audio':
         filename = video_id + '.mp3'
 
