@@ -73,9 +73,12 @@ def is_url(url):
 
 async def download(video_url):
     info_file = 'info.json'
-    output_filename = get_video_id(video_url) + '.webm'
+    video_id = get_video_id(video_url)
+    output_filename = video_id + '.webm'
+    # os.system(f'yt-dlp --list-formats {video_url}')
     command = f'yt-dlp -o "{output_filename}" {video_url} --quiet'
-    # -S res,ext:mp4:m4a --recode mp4
+    # -f "bv*[height=1080][fps=60]+ba*"   THERE IS NO 60 FPS, FPS IS A LIE
+    # -S res,ext:mp4:m4a --recode mp4   My pc will die in pain, so no mp4 :)
     with yt_dlp.YoutubeDL() as ydl:
         thread = Thread(
             group=None,
@@ -102,22 +105,27 @@ async def start_message(client, message: Message):
 
 @app.on_message()
 async def on_link(client, msg: Message):
-    if not is_url(msg.text):
+    text = msg.text.split()
+    url = None
+    for t in text:
+        if is_url(t):
+            url = t
+    if not url:
         await app.send_message(
             chat_id=msg.chat.id,
             reply_to_message_id=msg.id,
             text="Сообщение не является ссылкой"
         )
         return
-    video_id = get_video_id(msg.text)
+    video_id = get_video_id(url)
     filename = video_id + '.webm'
     bot_msg: Message = await app.send_message(
         chat_id=msg.chat.id,
         reply_to_message_id=msg.id,
         text="Обработка запроса"
     )
-    if get_video_id(msg.text) in storage:
-        video = storage[get_video_id(msg.text)]
+    if get_video_id(url) in storage:
+        video = storage[get_video_id(url)]
         await app.send_document(
             chat_id=msg.chat.id,
             reply_to_message_id=msg.id,
@@ -126,7 +134,7 @@ async def on_link(client, msg: Message):
         )
         await app.delete_messages(chat_id=bot_msg.chat.id, message_ids=bot_msg.id)
         return
-    video_path = await download(msg.text)
+    video_path = await download(url)
     video = await app.send_document(
         chat_id=msg.chat.id,
         reply_to_message_id=msg.id,
