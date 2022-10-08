@@ -148,7 +148,7 @@ async def on_link(client, msg: Message):
         reply_markup=generate_keyboard(get_video_id(url)),
         text=f"Название: {title}\n"
              f"Ссылка: {url}\n"
-             f"Описание: {description}"
+             f"Описание: \n{description}"
     )
 
 
