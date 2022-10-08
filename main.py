@@ -167,16 +167,24 @@ async def on_callback_query(client, callback_query: CallbackQuery):
 
     if f'{video_id}_{download_type}' in storage:
         video = storage[f'{video_id}_{download_type}']
-        # await app.answer_callback_query(
-        #     callback_query_id=callback_query.id,
-        #     text="✅ Готово!"
-        # )
-        await app.send_document(
-            chat_id=callback_query.message.chat.id,
-            reply_to_message_id=callback_query.message.id,
-            document=video,
-            file_name=filename
+        await callback_query.answer(
+            text="✅ Готово!"
         )
+        if download_type == 'video':
+            await app.send_document(
+                chat_id=callback_query.message.chat.id,
+                reply_to_message_id=callback_query.message.id,
+                document=video,
+                file_name=filename
+            )
+        else:
+            await app.send_audio(
+                chat_id=callback_query.message.chat.id,
+                reply_to_message_id=callback_query.message.id,
+                audio=video,
+                file_name=filename
+            )
+        await app.delete_messages(chat_id=bot_msg.chat.id, message_ids=bot_msg.id)
         return
 
     video_path = await download(f'https://youtu.be/{video_id}', download_type)
@@ -186,15 +194,16 @@ async def on_callback_query(client, callback_query: CallbackQuery):
         document=video_path,
         file_name=filename
     )
-    # await app.answer_callback_query(
-    #     callback_query_id=callback_query.id,
-    #     text="✅ Готово!"
-    # )
+    await callback_query.answer(
+        text="✅ Готово!"
+    )
     file_id = None
-    if video.document.file_id:
+    if video.document:
         file_id = video.document.file_id
-    else:
+    elif video.video:
         file_id = video.video.file_id
+    else:
+        file_id = video.audio.file_id
     storage.update({f'{video_id}_{download_type}': file_id})
     os.remove(video_path)
     save(storage)
