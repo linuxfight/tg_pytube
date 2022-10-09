@@ -203,7 +203,7 @@ async def on_callback_query(client, callback_query: CallbackQuery):
             text="⚙ Обработка запроса"
         )
     except:
-        pass
+        return
 
     storage.update({f'{video_id}_{download_type}': "Working"})
 
