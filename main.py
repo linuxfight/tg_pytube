@@ -131,9 +131,12 @@ async def on_link(client, msg: Message):
     except:
         pass
     url = None
-    for t in text:
-        if is_url(t):
-            url = t
+    try:
+        for t in text:
+            if is_url(t):
+                url = t
+    except:
+        pass
     if not url:
         return
 
