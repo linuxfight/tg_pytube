@@ -5,7 +5,7 @@ import yt_dlp
 
 from threading import Thread
 from os.path import exists
-from pyrogram import Client, filters
+from pyrogram import Client, filters, enums
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 
 
@@ -161,55 +161,100 @@ async def on_callback_query(client, callback_query: CallbackQuery):
     if download_type == 'audio':
         filename = video_id + '.mp3'
 
-    bot_msg: Message = await app.send_message(
-        chat_id=callback_query.message.chat.id,
-        reply_to_message_id=callback_query.message.id,
+    # bot_msg: Message = await app.send_message(
+    #     chat_id=callback_query.message.chat.id,
+    #     reply_to_message_id=callback_query.message.id,
+    #     text="⚙ Обработка запроса"
+    # )
+
+    if f'{video_id}_{download_type}' in storage and storage[f'{video_id}_{download_type}'] == "Working":
+        await callback_query.answer(
+            text="⚙ Производится скачивание, пожалуйста подождите"
+        )
+        return
+
+    await callback_query.answer(
         text="⚙ Обработка запроса"
     )
 
-    if f'{video_id}_{download_type}' in storage:
-        video = storage[f'{video_id}_{download_type}']
-        # await callback_query.answer(
-        #     text="✅ Готово!"
-        # )
-        if download_type == 'video':
-            await app.send_document(
-                chat_id=callback_query.message.chat.id,
-                reply_to_message_id=callback_query.message.id,
-                document=video,
-                file_name=filename
-            )
-        else:
-            await app.send_audio(
-                chat_id=callback_query.message.chat.id,
-                reply_to_message_id=callback_query.message.id,
-                audio=video,
-                file_name=filename
-            )
-        await app.delete_messages(chat_id=bot_msg.chat.id, message_ids=bot_msg.id)
-        return
+    storage.update({f'{video_id}_{download_type}': "Working"})
 
-    video_path = await download(f'https://youtu.be/{video_id}', download_type)
-    video = await app.send_document(
+    if storage[f'{video_id}_{download_type}'] != None:
+        if storage[f'{video_id}_{download_type}'] != "Working":
+            file = storage[f'{video_id}_{download_type}']
+            # await callback_query.answer(
+            #     text="✅ Готово!"
+            # )
+            if download_type == 'video':
+                await app.send_chat_action(
+                    chat_id=callback_query.message.chat.id,
+                    action=enums.ChatAction.UPLOAD_VIDEO
+                )
+                await app.send_document(
+                    chat_id=callback_query.message.chat.id,
+                    reply_to_message_id=callback_query.message.id,
+                    document=file,
+                    file_name=filename
+                )
+            else:
+                await app.send_chat_action(
+                    chat_id=callback_query.message.chat.id,
+                    action=enums.ChatAction.UPLOAD_AUDIO
+                )
+                await app.send_audio(
+                    chat_id=callback_query.message.chat.id,
+                    reply_to_message_id=callback_query.message.id,
+                    audio=file,
+                    file_name=filename
+                )
+            # await callback_query.answer(
+            #     text="✅ Готово!"
+            # )
+            # await app.delete_messages(chat_id=bot_msg.chat.id, message_ids=bot_msg.id)
+            return
+
+    file_path = await download(f'https://youtu.be/{video_id}', download_type)
+    await app.send_chat_action(
         chat_id=callback_query.message.chat.id,
-        reply_to_message_id=callback_query.message.id,
-        document=video_path,
-        file_name=filename
+        action=enums.ChatAction.UPLOAD_DOCUMENT
     )
+    file = None
+    if download_type == 'video':
+        await app.send_chat_action(
+            chat_id=callback_query.message.chat.id,
+            action=enums.ChatAction.UPLOAD_VIDEO
+        )
+        file = await app.send_document(
+            chat_id=callback_query.message.chat.id,
+            reply_to_message_id=callback_query.message.id,
+            document=file_path,
+            file_name=filename
+        )
+    else:
+        await app.send_chat_action(
+            chat_id=callback_query.message.chat.id,
+            action=enums.ChatAction.UPLOAD_AUDIO
+        )
+        file = await app.send_audio(
+            chat_id=callback_query.message.chat.id,
+            reply_to_message_id=callback_query.message.id,
+            audio=file_path,
+            file_name=filename
+        )
     # await callback_query.answer(
     #     text="✅ Готово!"
     # )
     file_id = None
-    if video.document:
-        file_id = video.document.file_id
-    elif video.video:
-        file_id = video.video.file_id
+    if file.document:
+        file_id = file.document.file_id
+    elif file.video:
+        file_id = file.video.file_id
     else:
-        file_id = video.audio.file_id
+        file_id = file.audio.file_id
     storage.update({f'{video_id}_{download_type}': file_id})
-    os.remove(video_path)
+    os.remove(file_path)
     save(storage)
-    await app.delete_messages(chat_id=bot_msg.chat.id, message_ids=bot_msg.id)
+    # await app.delete_messages(chat_id=bot_msg.chat.id, message_ids=bot_msg.id)
 
 
 if __name__ == '__main__':
