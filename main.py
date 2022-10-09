@@ -2,6 +2,7 @@ import os
 import json
 import re
 import yt_dlp
+import aiofiles
 
 from threading import Thread
 from os.path import exists
@@ -25,16 +26,19 @@ def config(key):
 
 def load():
     if exists("save.json"):
-        data = open("save.json", 'r').read()
+        with open("save.json", 'r') as file:
+            data = file.read()
         return json.loads(data)
     else:
         data = {}
-        open("save.json", 'w').write(json.dumps(data))
+        with open("save.json", 'w') as file:
+            file.write(json.dumps(data))
         return load()
 
 
-def save(self):
-    open("save.json", 'w').write(json.dumps(self))
+async def save(self):
+    async with aiofiles.open("save.json", 'w') as file:
+        await file.write(json.dumps(self))
 
 
 def login():
@@ -96,9 +100,6 @@ async def download(video_url, download_type):
         output_filename = video_id + '.mp3'
         command = f'yt-dlp -f "ba" -x --audio-format mp3 -o "{output_filename}" {video_url} --quiet'
 
-    # os.system(f'yt-dlp --list-formats {video_url}')
-    # -f "bv*[height=1080][fps=60]+ba*"   THERE IS NO 60 FPS, FPS IS A LIE
-    # -S res,ext:mp4:m4a --recode mp4   My pc will die in pain, so no mp4 :)
     thread = Thread(
         group=None,
         target=lambda: os.system(command)
@@ -134,11 +135,6 @@ async def on_link(client, msg: Message):
         if is_url(t):
             url = t
     if not url:
-        # await app.send_message(
-        #    chat_id=msg.chat.id,
-        #    reply_to_message_id=msg.id,
-        #    text="❌ Сообщение не является ссылкой"
-        # )
         return
 
     with yt_dlp.YoutubeDL() as ydl:
@@ -165,30 +161,9 @@ async def on_callback_query(client, callback_query: CallbackQuery):
     if download_type == 'audio':
         filename = video_id + '.mp3'
 
-    # bot_msg: Message = await app.send_message(
-    #     chat_id=callback_query.message.chat.id,
-    #     reply_to_message_id=callback_query.message.id,
-    #     text="⚙ Обработка запроса"
-    # )
-
-    if f'{video_id}_{download_type}' in storage and storage[f'{video_id}_{download_type}'] == "Working":
-        await callback_query.answer(
-            text="⚙ Производится скачивание, пожалуйста подождите"
-        )
-        return
-
-    await callback_query.answer(
-        text="⚙ Обработка запроса"
-    )
-
-    storage.update({f'{video_id}_{download_type}': "Working"})
-
     if storage[f'{video_id}_{download_type}'] != None:
         if storage[f'{video_id}_{download_type}'] != "Working":
             file = storage[f'{video_id}_{download_type}']
-            # await callback_query.answer(
-            #     text="✅ Готово!"
-            # )
             if download_type == 'video':
                 await app.send_chat_action(
                     chat_id=callback_query.message.chat.id,
@@ -211,11 +186,22 @@ async def on_callback_query(client, callback_query: CallbackQuery):
                     audio=file,
                     file_name=filename
                 )
-            # await callback_query.answer(
-            #     text="✅ Готово!"
-            # )
-            # await app.delete_messages(chat_id=bot_msg.chat.id, message_ids=bot_msg.id)
             return
+
+    try:
+        if f'{video_id}_{download_type}' in storage and storage[f'{video_id}_{download_type}'] == "Working":
+            await callback_query.answer(
+                text="⚙ Производится скачивание, пожалуйста подождите"
+            )
+            return
+
+        await callback_query.answer(
+            text="⚙ Обработка запроса"
+        )
+    except:
+        pass
+
+    storage.update({f'{video_id}_{download_type}': "Working"})
 
     file_path = await download(f'https://youtu.be/{video_id}', download_type)
     await app.send_chat_action(
@@ -245,9 +231,6 @@ async def on_callback_query(client, callback_query: CallbackQuery):
             audio=file_path,
             file_name=filename
         )
-    # await callback_query.answer(
-    #     text="✅ Готово!"
-    # )
     file_id = None
     if file.document:
         file_id = file.document.file_id
@@ -257,8 +240,7 @@ async def on_callback_query(client, callback_query: CallbackQuery):
         file_id = file.audio.file_id
     storage.update({f'{video_id}_{download_type}': file_id})
     os.remove(file_path)
-    save(storage)
-    # await app.delete_messages(chat_id=bot_msg.chat.id, message_ids=bot_msg.id)
+    await save(storage)
 
 
 if __name__ == '__main__':
