@@ -124,7 +124,11 @@ async def start_message(client, message: Message):
 
 @app.on_message()
 async def on_link(client, msg: Message):
-    text = msg.text.split()
+    text = None
+    try:
+        text = msg.text.split()
+    except:
+        pass
     url = None
     for t in text:
         if is_url(t):
