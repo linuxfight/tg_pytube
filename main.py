@@ -161,32 +161,33 @@ async def on_callback_query(client, callback_query: CallbackQuery):
     if download_type == 'audio':
         filename = video_id + '.mp3'
 
-    if storage[f'{video_id}_{download_type}'] != None:
-        if storage[f'{video_id}_{download_type}'] != "Working":
-            file = storage[f'{video_id}_{download_type}']
-            if download_type == 'video':
-                await app.send_chat_action(
-                    chat_id=callback_query.message.chat.id,
-                    action=enums.ChatAction.UPLOAD_VIDEO
-                )
-                await app.send_document(
-                    chat_id=callback_query.message.chat.id,
-                    reply_to_message_id=callback_query.message.id,
-                    document=file,
-                    file_name=filename
-                )
-            else:
-                await app.send_chat_action(
-                    chat_id=callback_query.message.chat.id,
-                    action=enums.ChatAction.UPLOAD_AUDIO
-                )
-                await app.send_audio(
-                    chat_id=callback_query.message.chat.id,
-                    reply_to_message_id=callback_query.message.id,
-                    audio=file,
-                    file_name=filename
-                )
-            return
+    if f'{video_id}_{download_type}' in storage:
+        if storage[f'{video_id}_{download_type}'] != None:
+            if storage[f'{video_id}_{download_type}'] != "Working":
+                file = storage[f'{video_id}_{download_type}']
+                if download_type == 'video':
+                    await app.send_chat_action(
+                        chat_id=callback_query.message.chat.id,
+                        action=enums.ChatAction.UPLOAD_VIDEO
+                    )
+                    await app.send_document(
+                        chat_id=callback_query.message.chat.id,
+                        reply_to_message_id=callback_query.message.id,
+                        document=file,
+                        file_name=filename
+                    )
+                else:
+                    await app.send_chat_action(
+                        chat_id=callback_query.message.chat.id,
+                        action=enums.ChatAction.UPLOAD_AUDIO
+                    )
+                    await app.send_audio(
+                        chat_id=callback_query.message.chat.id,
+                        reply_to_message_id=callback_query.message.id,
+                        audio=file,
+                        file_name=filename
+                    )
+                return
 
     try:
         if f'{video_id}_{download_type}' in storage and storage[f'{video_id}_{download_type}'] == "Working":
