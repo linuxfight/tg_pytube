@@ -1,10 +1,10 @@
+import asyncio
 import os
 import json
 import re
 import yt_dlp
 import aiofiles
 
-from threading import Thread
 from os.path import exists
 from pyrogram import Client, filters, enums
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
@@ -91,7 +91,6 @@ def generate_keyboard(video_id):
 
 
 async def download(video_url, download_type):
-    info_file = 'info.json'
     video_id = get_video_id(video_url)
     output_filename = video_id + '.mkv'
     command = f'yt-dlp --merge-output-format mkv -o "{output_filename}" {video_url} --quiet'
@@ -100,12 +99,13 @@ async def download(video_url, download_type):
         output_filename = video_id + '.mp3'
         command = f'yt-dlp -f "ba" -x --audio-format mp3 -o "{output_filename}" {video_url} --quiet'
 
-    thread = Thread(
-        group=None,
-        target=lambda: os.system(command)
+    process = await asyncio.create_subprocess_shell(
+        command
     )
-    thread.run()
-    while thread.is_alive():
+
+    await process.communicate()
+
+    while process.returncode != 0:
         pass
     else:
         while not exists(output_filename):
@@ -160,9 +160,16 @@ async def on_callback_query(client, callback_query: CallbackQuery):
     data = callback_query.data.split(':')
     video_id = data[0]
     download_type = data[1]
+    with yt_dlp.YoutubeDL() as ydl:
+        info: dict = ydl.extract_info(
+            download=False,
+            url=f'https://youtu.be/{video_id}'
+        )
     filename = video_id + '.mkv'
+    telegram_filename = info['title'] + '.mkv'
     if download_type == 'audio':
         filename = video_id + '.mp3'
+        telegram_filename = info['title'] + '.mp3'
 
     if f'{video_id}_{download_type}' in storage:
         if storage[f'{video_id}_{download_type}'] != None:
@@ -177,7 +184,7 @@ async def on_callback_query(client, callback_query: CallbackQuery):
                         chat_id=callback_query.message.chat.id,
                         reply_to_message_id=callback_query.message.id,
                         document=file,
-                        file_name=filename
+                        file_name=telegram_filename
                     )
                 else:
                     await app.send_chat_action(
@@ -188,7 +195,7 @@ async def on_callback_query(client, callback_query: CallbackQuery):
                         chat_id=callback_query.message.chat.id,
                         reply_to_message_id=callback_query.message.id,
                         audio=file,
-                        file_name=filename
+                        file_name=telegram_filename
                     )
                 return
 
@@ -222,7 +229,7 @@ async def on_callback_query(client, callback_query: CallbackQuery):
             chat_id=callback_query.message.chat.id,
             reply_to_message_id=callback_query.message.id,
             document=file_path,
-            file_name=filename
+            file_name=telegram_filename
         )
     else:
         await app.send_chat_action(
@@ -233,7 +240,7 @@ async def on_callback_query(client, callback_query: CallbackQuery):
             chat_id=callback_query.message.chat.id,
             reply_to_message_id=callback_query.message.id,
             audio=file_path,
-            file_name=filename
+            file_name=telegram_filename
         )
     file_id = None
     if file.document:
