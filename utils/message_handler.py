@@ -60,5 +60,5 @@ async def on_link(client, msg):
         reply_to_message_id=msg.id,
         reply_markup=generate_keyboard(get_video_id(url)),
         text=f"Название: {title}\n"
-             f"Ссылка: {url}\n"
+             f"[Ссылка]({url})\n"
     )
