@@ -46,6 +46,7 @@ async def on_callback_query(client: Client, callback_query: CallbackQuery):
         video_format = f'{data[2]}'
     else:
         if download_type == 'video':
+            print(generate_keyboard(video_id))
             await client.send_message(
                 chat_id=callback_query.message.chat.id,
                 reply_to_message_id=callback_query.message.id,
