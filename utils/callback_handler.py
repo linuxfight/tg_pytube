@@ -25,9 +25,8 @@ def generate_keyboard(video_id):
         if f['resolution'] != 'audio only':
             print(f.keys())
             print(f['vcodec'])
-            print(f['acodec'])
             print(f['video_ext'])
-            print(f['audio_ext'])
+            print(f['format_id'])
             if f['height'] in video_resolutions and f['video_ext'] == 'mp4' and not f['acodec'] and 'avc1' in f['vcodec']:
                 buttons.append(
                     InlineKeyboardButton(
