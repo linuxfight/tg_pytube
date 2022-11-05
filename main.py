@@ -6,21 +6,11 @@ from utils.login import login
 
 
 app = login()
-callback_query_handler = CallbackQueryHandler(
-    on_callback_query
-)
-link_handler = MessageHandler(
-    on_link
-)
-start_handler = MessageHandler(
-    on_start_message,
-    filters.command('start')
-)
 
 
-app.add_handler(callback_query_handler)
-app.add_handler(link_handler)
-app.add_handler(start_handler)
+app.add_handler(MessageHandler(on_start_message, filters.command('start')))
+app.add_handler((MessageHandler(on_link)))
+app.add_handler(CallbackQueryHandler(on_callback_query))
 
 
 if __name__ == '__main__':
