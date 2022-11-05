@@ -23,11 +23,7 @@ def generate_keyboard(video_id):
 
     for f in formats:
         if f['resolution'] != 'audio only':
-            print(f.keys())
-            print(f['vcodec'])
-            print(f['video_ext'])
-            print(f['format_id'])
-            if f['height'] in video_resolutions and f['video_ext'] == 'mp4' and not f['acodec'] and 'avc1' in f['vcodec']:
+            if f['height'] in video_resolutions and f['video_ext'] == 'mp4' and 'avc1' in f['vcodec']:
                 buttons.append(
                     InlineKeyboardButton(
                         text=str(f['height']) + 'p',
@@ -50,7 +46,6 @@ async def on_callback_query(client: Client, callback_query: CallbackQuery):
         video_format = f'{data[2]}'
     else:
         if download_type == 'video':
-            print(generate_keyboard(video_id))
             await client.send_message(
                 chat_id=callback_query.message.chat.id,
                 reply_to_message_id=callback_query.message.id,
