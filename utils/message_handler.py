@@ -39,14 +39,14 @@ async def on_link(client, msg):
     text = None
     try:
         text = msg.text.split()
-    except ValueError:
+    except AttributeError:
         pass
     url = None
     try:
         for t in text:
             if is_url(t):
                 url = t
-    except ValueError:
+    except AttributeError:
         pass
     if not url:
         return
