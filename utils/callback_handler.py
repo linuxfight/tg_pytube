@@ -7,7 +7,7 @@ from utils.download import download
 
 
 storage = load()
-video_resolutions = [144, 240, 360, 480, 720, 1080, 1440, 2160]
+video_formats = [160, 133, 134, 135, 136, 298, 137, 299, 264, 138, 266]
 
 
 def generate_keyboard(video_id):
@@ -23,15 +23,16 @@ def generate_keyboard(video_id):
 
     for f in formats:
         if f['resolution'] != 'audio only':
-            if f['height'] in video_resolutions and f['video_ext'] == 'mp4' and 'avc1' in f['vcodec']:
-                buttons.append(
-                    [
-                        InlineKeyboardButton(
-                            text=str(f['height']) + 'p',
-                            callback_data=video_id + ':video:' + str(f['format_id'])
-                        )
-                    ]
-                )
+            for video_format in video_formats:
+                if str(video_format) == f['format_id']:
+                    buttons.append(
+                        [
+                            InlineKeyboardButton(
+                                text=str(f['resolution']) + 'p ' + str(f['fps']) + 'fps',
+                                callback_data=video_id + ':video:' + str(f['format_id'])
+                            )
+                        ]
+                    )
 
     return InlineKeyboardMarkup(
         buttons
