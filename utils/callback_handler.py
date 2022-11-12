@@ -63,7 +63,7 @@ async def on_callback_query(client: Client, callback_query: CallbackQuery):
             download=False,
             url=f'https://youtu.be/{video_id}'
         )
-    telegram_filename = info['title'] + '.mp4'
+    telegram_filename = info['title'] + '.webm'
     if download_type == 'audio':
         telegram_filename = info['title'] + '.mp3'
 
