@@ -7,7 +7,7 @@ from os.path import exists
 async def download(video_url, download_type, video_format):
     video_id = get_video_id(video_url)
     output_filename = video_id + '.mkv'
-    command = f'yt-dlp -f {video_format}+bestaudio/best --merge-output-format mov -o "{output_filename}" {video_url} --quiet'
+    command = f'yt-dlp -f {video_format}+bestaudio/best --merge-output-format mp4 -o "{output_filename}" {video_url} --quiet'
 
     if download_type == "audio":
         output_filename = video_id + '.mp3'
