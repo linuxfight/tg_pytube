@@ -9,7 +9,7 @@ async def download(video_url, download_type, video_format):
     logging.basicConfig(filename='example.log', encoding='utf-8', level=logging.DEBUG)
     video_id = get_video_id(video_url)
     output_filename = video_id + '.mkv'
-    command = f'yt-dlp -f {video_format}+bestaudio/best --merge-output-format webm -o "{output_filename}" {video_url}' # --quiet
+    command = f'yt-dlp -f {video_format}+bestaudio/best --merge-output-format mkv -o "{output_filename}" {video_url}' # --quiet
 
     if download_type == "audio":
         output_filename = video_id + '.m4a'
