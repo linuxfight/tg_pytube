@@ -23,7 +23,7 @@ def generate_keyboard(video_id):
 
     for f in formats:
         if f['resolution'] != 'audio only':
-            # print(f['resolution'], f['format_id'], f['fps'], f['vcodec'])
+            print(f['resolution'], f['format_id'], f['fps'], f['vcodec'], f['acodec'])
             for video_format in video_formats:
                 if str(video_format) == f['format_id']:
                     buttons.append(
@@ -65,7 +65,7 @@ async def on_callback_query(client: Client, callback_query: CallbackQuery):
         )
     telegram_filename = info['title'] + '.webm'
     if download_type == 'audio':
-        telegram_filename = info['title'] + '.mp3'
+        telegram_filename = info['title'] + '.m4a'
 
     if f'{video_id}_{download_type}_{video_format}' in storage:
         if storage[f'{video_id}_{download_type}_{video_format}'] is None:
@@ -77,10 +77,10 @@ async def on_callback_query(client: Client, callback_query: CallbackQuery):
                     chat_id=callback_query.message.chat.id,
                     action=enums.ChatAction.UPLOAD_VIDEO
                 )
-                await client.send_document(
+                await client.send_video(
                     chat_id=callback_query.message.chat.id,
                     reply_to_message_id=callback_query.message.id,
-                    document=file,
+                    video=file,
                     file_name=telegram_filename,
                     caption=f'[Ссылка](https://youtu.be/{video_id})'
                 )
@@ -124,10 +124,10 @@ async def on_callback_query(client: Client, callback_query: CallbackQuery):
             chat_id=callback_query.message.chat.id,
             action=enums.ChatAction.UPLOAD_VIDEO
         )
-        file = await client.send_document(
+        file = await client.send_video(
             chat_id=callback_query.message.chat.id,
             reply_to_message_id=callback_query.message.id,
-            document=file_path,
+            video=file_path,
             file_name=telegram_filename,
             caption=f'[Ссылка](https://youtu.be/{video_id})'
         )
