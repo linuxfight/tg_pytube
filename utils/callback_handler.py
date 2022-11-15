@@ -1,5 +1,7 @@
 import yt_dlp
-import os
+
+from tempfile import TemporaryDirectory
+from pathlib import Path
 from pyrogram import enums, Client
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from utils.storage import save, load
@@ -23,7 +25,6 @@ def generate_keyboard(video_id):
 
     for f in formats:
         if f['resolution'] != 'audio only':
-            print(f['resolution'], f['format_id'], f['fps'], f['vcodec'], f['acodec'])
             for video_format in video_formats:
                 if str(video_format) == f['format_id']:
                     buttons.append(
@@ -58,12 +59,26 @@ async def on_callback_query(client: Client, callback_query: CallbackQuery):
             )
             return
 
+
+    try:
+        if f'{video_id}_{download_type}_{video_format}' in storage and storage[f'{video_id}_{download_type}_{video_format}'] == "Working":
+            await callback_query.answer(
+                text="⚙ Производится скачивание, пожалуйста подождите"
+            )
+            return
+
+        await callback_query.answer(
+            text="⚙ Обработка запроса"
+        )
+    except:
+        return
+
     with yt_dlp.YoutubeDL() as ydl:
         info: dict = ydl.extract_info(
             download=False,
             url=f'https://youtu.be/{video_id}'
         )
-    telegram_filename = info['title'] + '.mkv'
+    telegram_filename = info['title'] + '.webm'
     if download_type == 'audio':
         telegram_filename = info['title'] + '.m4a'
 
@@ -98,51 +113,40 @@ async def on_callback_query(client: Client, callback_query: CallbackQuery):
                 )
             return
 
-    try:
-        if f'{video_id}_{download_type}_{video_format}' in storage and storage[f'{video_id}_{download_type}_{video_format}'] == "Working":
-            await callback_query.answer(
-                text="⚙ Производится скачивание, пожалуйста подождите"
-            )
-            return
-
-        await callback_query.answer(
-            text="⚙ Обработка запроса"
-        )
-    except:
-        return
-
     storage.update({f'{video_id}_{download_type}_{video_format}': "Working"})
 
-    file_path = await download(f'https://youtu.be/{video_id}', download_type, video_format)
-    await client.send_chat_action(
-        chat_id=callback_query.message.chat.id,
-        action=enums.ChatAction.UPLOAD_DOCUMENT
-    )
-    file = None
-    if download_type == 'video':
+    with TemporaryDirectory() as temp:
+        path = await download(f'https://youtu.be/{video_id}', download_type, video_format, Path(temp))
         await client.send_chat_action(
             chat_id=callback_query.message.chat.id,
-            action=enums.ChatAction.UPLOAD_VIDEO
+            action=enums.ChatAction.UPLOAD_DOCUMENT
         )
-        file = await client.send_video(
-            chat_id=callback_query.message.chat.id,
-            reply_to_message_id=callback_query.message.id,
-            video=file_path,
-            file_name=telegram_filename,
-            caption=f'[Ссылка](https://youtu.be/{video_id})'
-        )
-    else:
-        await client.send_chat_action(
-            chat_id=callback_query.message.chat.id,
-            action=enums.ChatAction.UPLOAD_AUDIO
-        )
-        file = await client.send_audio(
-            chat_id=callback_query.message.chat.id,
-            reply_to_message_id=callback_query.message.id,
-            audio=file_path,
-            file_name=telegram_filename,
-            caption=f'[Ссылка](https://youtu.be/{video_id})'
-        )
+        file = None
+        if download_type == 'video':
+            await client.send_chat_action(
+                chat_id=callback_query.message.chat.id,
+                action=enums.ChatAction.UPLOAD_VIDEO
+            )
+            file = await client.send_video(
+                chat_id=callback_query.message.chat.id,
+                reply_to_message_id=callback_query.message.id,
+                video=path,
+                file_name=telegram_filename,
+                caption=f'[Ссылка](https://youtu.be/{video_id})'
+            )
+        else:
+            await client.send_chat_action(
+                chat_id=callback_query.message.chat.id,
+                action=enums.ChatAction.UPLOAD_AUDIO
+            )
+            file = await client.send_audio(
+                chat_id=callback_query.message.chat.id,
+                reply_to_message_id=callback_query.message.id,
+                audio=path,
+                file_name=telegram_filename,
+                caption=f'[Ссылка](https://youtu.be/{video_id})'
+            )
+
     file_id = None
     if file.document:
         file_id = file.document.file_id
@@ -151,5 +155,4 @@ async def on_callback_query(client: Client, callback_query: CallbackQuery):
     else:
         file_id = file.audio.file_id
     storage.update({f'{video_id}_{download_type}_{video_format}': file_id})
-    os.remove(file_path)
     await save(storage)
