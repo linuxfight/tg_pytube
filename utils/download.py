@@ -3,7 +3,7 @@ import asyncio
 
 async def download(video_url, download_type, video_format, file_ext, directory):
     output = directory / f'video.{file_ext}'
-    command = f'yt-dlp -f {video_format}+bestaudio/best -N 64 --merge-output-format {file_ext} -o {output} {video_url}' # --quiet
+    command = f'yt-dlp -f {video_format}+bestaudio/best -N 64 --merge-output-format {file_ext} -o {output} {video_url} --quiet'
 
     if download_type == "audio":
         output = directory / f'audio.{file_ext}'
