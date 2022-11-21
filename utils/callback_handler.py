@@ -20,17 +20,20 @@ def resolution_keyboard(video_id):
             url=f'https://youtu.be/{video_id}'
         )
 
-    formats = info['formats']
+    formats: list[dict] = info['formats']
 
     for f in formats:
         if f['resolution'] != 'audio only':
             for video_format in video_formats:
                 if str(video_format) == f['format_id']:
+                    filesize = f.get('filesize')
+                    if filesize is None:
+                        filesize = f.get('filesize_approx')
                     buttons.append(
                         [
                             InlineKeyboardButton(
                                 text=str(f['resolution']) + 'p ' + str(f['fps']) + 'fps ' + str(
-                                    int(f['filesize'] / (1024 * 1024))) + 'MB',
+                                    int(filesize / (1024 * 1024))) + 'MB',
                                 callback_data=f'{video_id}:video:{str(f["format_id"])}'
                             )
                         ]
