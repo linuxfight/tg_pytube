@@ -21,23 +21,25 @@ def resolution_keyboard(video_id):
         )
 
     formats: list[dict] = info['formats']
+    audio_formats = []
 
     for f in formats:
-        if f['resolution'] != 'audio only':
-            for video_format in video_formats:
-                if str(video_format) == f['format_id']:
-                    filesize = f.get('filesize')
-                    if filesize is None:
-                        filesize = f.get('filesize_approx')
-                    buttons.append(
-                        [
-                            InlineKeyboardButton(
-                                text=str(f['resolution']) + 'p ' + str(f['fps']) + 'fps ' + str(
-                                    int(filesize / (1024 * 1024))) + 'MB',
-                                callback_data=f'{video_id}:video:{str(f["format_id"])}'
-                            )
-                        ]
-                    )
+        if f['resolution'] == 'audio only':
+            audio_formats.append(f)
+        for video_format in video_formats:
+            if str(video_format) == f['format_id']:
+                file_size = int(f.get('filesize')/ (1024 * 1024))
+                if file_size is None:
+                    file_size = int(f.get('filesize_approx') / (1024 * 1024))
+                file_size += int(audio_formats[-1]['filesize'] / (1024 * 1024))
+                buttons.append(
+                    [
+                        InlineKeyboardButton(
+                            text=str(f['resolution']) + 'p ' + str(f['fps']) + 'fps ' + str(file_size) + 'MB',
+                            callback_data=f'{video_id}:video:{str(f["format_id"])}'
+                        )
+                    ]
+                )
 
     return InlineKeyboardMarkup(
         buttons
