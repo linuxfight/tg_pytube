@@ -1,13 +1,11 @@
 import asyncio
 
 
-async def download(video_url, download_type, video_format, file_ext, directory):
-    output = directory / f'video.{file_ext}'
-    command = f'yt-dlp -f {video_format}+bestaudio/best -N 64 --merge-output-format {file_ext} -o {output} {video_url} --quiet'
+async def download(video_url, download_type, video_format, path):
+    command = f'yt-dlp -f {video_format}+bestaudio/best --merge-output-format mkv -o {path} {video_url} --quiet'
 
     if download_type == "audio":
-        output = directory / f'audio.{file_ext}'
-        command = f'yt-dlp -f ba -N 64 -x --audio-format {file_ext} -o {output} {video_url} --quiet'
+        command = f'yt-dlp -f ba -x --audio-format m4a -o {path} {video_url} --quiet'
 
     process = await asyncio.create_subprocess_shell(
         command
@@ -18,4 +16,4 @@ async def download(video_url, download_type, video_format, file_ext, directory):
     while process.returncode != 0:
         pass
     else:
-        return output
+        return path
