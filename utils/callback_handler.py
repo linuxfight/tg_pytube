@@ -91,9 +91,8 @@ async def on_callback_query(client: Client, callback_query: CallbackQuery):
         title = info['title']
         channel = info['channel']
         duration = int(info['duration'])
-        thumbs: list[dict] = info['thumbnails']
         telegram_thumbs = []
-        for t in thumbs:
+        for t in info['thumbnails']:
             if 'resolution' in t:
                 if t['height'] <= 320 and t['width'] <= 320:
                     telegram_thumbs.append(t)
@@ -145,7 +144,7 @@ async def on_callback_query(client: Client, callback_query: CallbackQuery):
                 file_name=telegram_filename
             )
         else:
-            await set_cover(Path(temp), path, info['thumbnails'][-1]['url'])
+            await set_cover(Path(temp), path, f'https://img.youtube.com/vi/{video_id}/maxresdefault.jpg')
             set_artist(path, channel)
             await client.send_chat_action(
                 chat_id=callback_query.message.chat.id,
